@@ -1,0 +1,5 @@
+streamlit==1.28.0
+opencv-python==4.8.0.76
+pytesseract==0.3.10
+deepface==0.0.79
+geopy==2.3.0
