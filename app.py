@@ -1,4 +1,4 @@
-# ai_emotion_location_app.py (final combined version)
+# ai_emotion_location_app.py (debugged version)
 
 import streamlit as st
 import cv2
@@ -128,7 +128,7 @@ def load_models():
 
 face_cascade, eye_cascade, smile_cascade = load_models()
 
-# ----------------- 情绪检测功能 (完全保留第一个代码版本) -----------------
+# ----------------- 核心功能 -----------------
 def detect_emotion(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -250,7 +250,8 @@ def main():
                     with col2:
                         t1, t2 = st.tabs([T["original_image"], T["processed_image"]])
                         with t1: st.image(image, use_container_width=True)
-                        with t2: st.image(detected_img, channels="BGR", use_container_width=True)
+                        with t2: st.image(detected_img, channels="BGR", use_container_width=True, 
+                                          caption=f"Detected {len(faces)} faces")
                 except Exception as e:
                     st.error(f"{T['error_processing']}: {e}")
 
