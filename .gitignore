@@ -1,0 +1,9 @@
+*.pyc
+__pycache__/
+*.csv
+*.jpg
+*.png
+*.env
+*.DS_Store
+history/
+.vscode/
