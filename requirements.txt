@@ -11,3 +11,5 @@ seaborn==0.13.0
 plotly>=5.0.0
 geopy==2.4.1
 python-dotenv==1.0.0
+tqdm==4.66.2
+scikit-image==0.22.0
