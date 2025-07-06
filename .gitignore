@@ -4,6 +4,6 @@ __pycache__/
 *.jpg
 *.png
 *.env
-*.DS_Store
+.DS_Store
 history/
-.vscode/
+.venv/
