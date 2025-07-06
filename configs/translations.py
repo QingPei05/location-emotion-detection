@@ -1,1 +1,56 @@
-
+TRANSLATIONS = {
+    "English": {
+        "title": "Advanced Emotion Detector",
+        "upload_guide": "Upload photo for emotion analysis",
+        "username": "Username",
+        "upload_image": "Upload Image (JPG/PNG)",
+        "analysis_results": "Analysis Results",
+        "detected_emotion": "Detected Emotion",
+        "confidence": "Confidence",
+        "no_faces": "No faces detected",
+        "error_processing": "Error processing image",
+        "settings": "Settings",
+        "history": "History",
+        "min_conf": "Minimum Confidence",
+        "detector": "Face Detector",
+        "analyzing": "Analyzing emotions...",
+        "original": "Original",
+        "processed": "Processed"
+    },
+    "中文": {
+        "title": "高级情绪检测系统",
+        "upload_guide": "上传照片进行情绪分析",
+        "username": "用户名",
+        "upload_image": "上传图片 (JPG/PNG)",
+        "analysis_results": "分析结果",
+        "detected_emotion": "检测到的情绪",
+        "confidence": "置信度",
+        "no_faces": "未检测到人脸",
+        "error_processing": "图片处理错误",
+        "settings": "设置",
+        "history": "历史记录",
+        "min_conf": "最小置信度",
+        "detector": "人脸检测器",
+        "analyzing": "正在分析情绪...",
+        "original": "原始图片",
+        "processed": "处理结果"
+    },
+    "Malay": {
+        "title": "Pengesan Emosi Maju",
+        "upload_guide": "Muat naik foto untuk analisis emosi",
+        "username": "Nama pengguna",
+        "upload_image": "Muat Naik Imej (JPG/PNG)",
+        "analysis_results": "Keputusan Analisis",
+        "detected_emotion": "Emosi yang Dikesan",
+        "confidence": "Keyakinan",
+        "no_faces": "Tiada muka dikesan",
+        "error_processing": "Ralat memproses imej",
+        "settings": "Tetapan",
+        "history": "Sejarah",
+        "min_conf": "Keyakinan Minimum",
+        "detector": "Pengesan Muka",
+        "analyzing": "Menganalisis emosi...",
+        "original": "Asal",
+        "processed": "Diproses"
+    }
+}
