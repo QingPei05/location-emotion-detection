@@ -1,4 +1,4 @@
-# ai_emotion_location_app.py (combined version)
+# ai_emotion_location_app.py (final combined version)
 
 import streamlit as st
 import cv2
@@ -128,42 +128,28 @@ def load_models():
 
 face_cascade, eye_cascade, smile_cascade = load_models()
 
-# ----------------- 改进的情绪检测功能 -----------------
+# ----------------- 情绪检测功能 (完全保留第一个代码版本) -----------------
 def detect_emotion(img):
-    """Detect emotions using OpenCV (happy, neutral, sad, angry)"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    
     emotions = []
     for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
-        
-        # Detect smiles
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
-        # Detect eyes
         eyes = eye_cascade.detectMultiScale(roi_gray)
-        
-        # Emotion detection logic
-        emotion = "neutral"  # default
-        
-        # Anger detection
+        emotion = "neutral"
         if len(eyes) >= 2:
-            eye_centers = [y + ey + eh/2 for (ex,ey,ew,eh) in eyes[:2]]
-            avg_eye_height = np.mean(eye_centers)
-            eye_sizes = [eh for (ex,ey,ew,eh) in eyes[:2]]
+            eye_sizes = [eh for (_,ey,_,eh) in eyes[:2]]
             avg_eye_size = np.mean(eye_sizes)
-            
+            eye_centers = [ey + eh/2 for (_,ey,_,eh) in eyes[:2]]
+            avg_eye_height = np.mean(eye_centers)
             if avg_eye_size > h/5 and avg_eye_height < h/2.5:
                 emotion = "angry"
             elif avg_eye_height < h/3:
                 emotion = "sad"
-        
-        # Happiness detection (priority)
         if len(smiles) > 0:
             emotion = "happy"
-        
         emotions.append(emotion)
-    
     return emotions, faces
 
 def draw_detections(img, emotions, faces):
@@ -254,17 +240,8 @@ def main():
                     with col1:
                         st.subheader("🔍 Detection Results")
                         if emotions:
-                            # Count each emotion type
-                            emotion_count = {}
-                            for emo in emotions:
-                                emotion_count[emo] = emotion_count.get(emo, 0) + 1
-                            
-                            # Format the result string
-                            result_parts = []
-                            for emo, count in emotion_count.items():
-                                result_parts.append(f"{count} {emo.capitalize()}")
-                            
-                            st.success(f"🎭 Detected {len(faces)} face(s): " + ", ".join(result_parts))
+                            emo_count = {e: emotions.count(e) for e in set(emotions)}
+                            st.success(f"🎭 {len(faces)} face(s): {', '.join(f'{v} {k}' for k,v in emo_count.items())}")
                             show_detection_guide(True)
                             save_history(username, emotions[0], "Unknown")
                         else:
