@@ -1,9 +1,28 @@
+# Python
 *.pyc
 __pycache__/
+*.swp
+*.env
+
+# Data
 *.csv
 *.jpg
 *.png
-*.env
+*.npy
+
+# System
 .DS_Store
-history/
+.idea/
+.vscode/
+
+# Virtual Environment
 .venv/
+venv/
+
+# Logs
+*.log
+logs/
+
+# DeepFace models
+.deepface/
+weights/
