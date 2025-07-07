@@ -194,15 +194,23 @@ def main_app():
 
 # ----------------- Run App -----------------
 if __name__ == "__main__":
+    # Initialize session state variables
     if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
+        st.session_state.logged_in = False
     if "show_signup" not in st.session_state:
-        st.session_state["show_signup"] = False
-    
-    if not st.session_state["logged_in"]:
-        if st.session_state["show_signup"]:
+        st.session_state.show_signup = False
+    if "username" not in st.session_state:
+        st.session_state.username = ""
+
+    # Authentication flow
+    if not st.session_state.logged_in:
+        if st.session_state.show_signup:
             signup_page()
         else:
             login_page()
     else:
-        main_app()
+        try:
+            main_app()
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            st.stop()
