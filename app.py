@@ -65,41 +65,18 @@ def get_detector():
 
 detector = get_detector()
 
-def save_history(username, image_id, emotions, confidences, location="Unknown"):
+def save_history(username, emotions, confidences, location="Unknown"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    records = []
+    for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+        records.append([location, emo, conf, now])
     
-    # Count each emotion type
-    emotion_counts = {}
-    for emo in emotions:
-        emotion_counts[emo] = emotion_counts.get(emo, 0) + 1
-    
-    # Format emotions string (e.g. "2 happy, 1 sad")
-    emotions_str = ", ".join([f"{count} {emotion}" for emotion, count in emotion_counts.items()])
-    
-    # Save image with unique ID
-    image_path = f"history_images/{image_id}.jpg"
-    os.makedirs("history_images", exist_ok=True)
-    cv2.imwrite(image_path, cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
-    
-    # Create record
-    record = {
-        "location": location,
-        "emotions": emotions_str,
-        "timestamp": now,
-        "image_id": image_id,
-        "all_emotions": ",".join(emotions),
-        "all_confidences": ",".join(map(str, confidences))
-    }
-    
-    # Save to CSV
+    df = pd.DataFrame(records, columns=["Location", "Emotion", "Confidence", "timestamp"])
     try:
         if os.path.exists("history.csv"):
-            history_df = pd.read_csv("history.csv")
-            history_df = pd.concat([history_df, pd.DataFrame([record])])
-        else:
-            history_df = pd.DataFrame([record])
-        
-        history_df.to_csv("history.csv", index=False)
+            prev = pd.read_csv("history.csv")
+            df = pd.concat([prev, df])
+        df.to_csv("history.csv", index=False)
     except Exception as e:
         st.error(f"Failed to save history: {e}")
 
@@ -232,175 +209,33 @@ def main_app():
         st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
 
     with tabs[2]:
-    st.subheader("📜 Upload History")
-    try:
-        if os.path.exists("history.csv"):
-            df = pd.read_csv("history.csv")
-            if df.empty:
-                st.info("No upload records found.")
-            else:
-                # Display simplified history table
-                st.dataframe(df[["location", "emotions", "timestamp"]], 
-                            use_container_width=True)
-                
-                # Add selection functionality
-                selected_index = st.selectbox(
-                    "Select a record to view details:",
-                    range(len(df)),
-                    format_func=lambda x: f"Record {x+1} - {df.iloc[x]['timestamp']}"
-                )
-                
-                if selected_index is not None:
-                    record = df.iloc[selected_index]
-                    with st.expander(f"📄 Details for {record['timestamp']}", expanded=True):
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            # Show original image
-                            image_path = f"history_images/{record['image_id']}.jpg"
-                            if os.path.exists(image_path):
-                                st.image(image_path, caption="Original Image", use_column_width=True)
-                            else:
-                                st.warning("Original image not found")
-                            
-                        with col2:
-                            # Show emotion analysis
-                            st.write(f"**Location:** {record['location']}")
-                            st.write(f"**Timestamp:** {record['timestamp']}")
-                            
-                            # Create pie chart for this image's emotions
-                            emotions = record['all_emotions'].split(',')
-                            confidences = list(map(float, record['all_confidences'].split(',')))
-                            
-                            fig = px.pie(
-                                names=emotions,
-                                values=confidences,
-                                title="Emotion Distribution for This Image"
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No history file found.")
-    except Exception as e:
-        st.warning(f"Error loading history records: {e}")
-
-    with tabs[3]:
-        st.subheader("📊 Emotion Analysis Chart")
+        st.subheader("📜 Upload History")
         try:
             if os.path.exists("history.csv"):
                 df = pd.read_csv("history.csv")
                 if df.empty:
-                    st.info("No emotion records found.")
+                    st.info("No upload records found.")
                 else:
-                    fig = px.pie(df, names="Emotion", title="Emotion Distribution")
-                    st.plotly_chart(fig)
-                    st.caption("Chart shows distribution of all detected emotions")
+                    # Display the history without username
+                    edited_df = st.data_editor(
+                        df[["Location", "Emotion", "Confidence", "timestamp"]],
+                        key="history_editor"
+                    )
+                    
+                    # Show details when row is selected
+                    if "history_editor" in st.session_state:
+                        selected_rows = st.session_state.history_editor["edited_rows"]
+                        for idx, changes in selected_rows.items():
+                            if changes:
+                                with st.expander(f"Details for record {idx+1}"):
+                                    st.write(f"Location: {df.iloc[idx]['Location']}")
+                                    st.write(f"Emotion: {df.iloc[idx]['Emotion']}")
+                                    st.write(f"Confidence: {df.iloc[idx]['Confidence']}%")
+                                    st.write(f"Timestamp: {df.iloc[idx]['timestamp']}")
             else:
                 st.info("No history file found.")
         except Exception as e:
-            st.error(f"Error generating chart: {e}")
-
-
-# Add this function to your app.py (place it with your other utility functions)
-def detect_location(img):
-    """Detect location from image using EXIF data or other methods"""
-    try:
-        # Method 1: Check for EXIF GPS data
-        pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        exif_data = pil_img._getexif()
-        
-        if exif_data:
-            from PIL.ExifTags import TAGS, GPSTAGS
-            gps_info = {}
-            for tag, value in exif_data.items():
-                decoded = TAGS.get(tag, tag)
-                if decoded == "GPSInfo":
-                    for t in value:
-                        sub_decoded = GPSTAGS.get(t, t)
-                        gps_info[sub_decoded] = value[t]
-            
-            if 'GPSLatitude' in gps_info and 'GPSLongitude' in gps_info:
-                def convert_to_degrees(value):
-                    return float(value[0]) + float(value[1])/60 + float(value[2])/3600
-                
-                lat = convert_to_degrees(gps_info['GPSLatitude'])
-                lon = convert_to_degrees(gps_info['GPSLongitude'])
-                
-                if gps_info.get('GPSLatitudeRef') == 'S':
-                    lat = -lat
-                if gps_info.get('GPSLongitudeRef') == 'W':
-                    lon = -lon
-                
-                from geopy.geocoders import Nominatim
-                geolocator = Nominatim(user_agent="emotion_detector")
-                location = geolocator.reverse(f"{lat}, {lon}", exactly_one=True)
-                return location.address if location else None
-        
-        # Method 2: If no EXIF data, use a placeholder (you can implement other methods here)
-        return None
-        
-    except Exception as e:
-        print(f"Location detection error: {e}")
-        return None
-
-    with tabs[1]:
-        st.subheader("🗺️ Random Location Sample (Demo)")
-        st.map(pd.DataFrame({
-            'lat': [3.139 + random.uniform(-0.01, 0.01)],
-            'lon': [101.6869 + random.uniform(-0.01, 0.01)]
-        }))
-        st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
-
-    with tabs[2]:
-    st.subheader("📜 Upload History")
-    try:
-        if os.path.exists("history.csv"):
-            df = pd.read_csv("history.csv")
-            if df.empty:
-                st.info("No upload records found.")
-            else:
-                # Display simplified history table
-                st.dataframe(df[["location", "emotions", "timestamp"]], 
-                            use_container_width=True)
-                
-                # Add selection functionality
-                selected_index = st.selectbox(
-                    "Select a record to view details:",
-                    range(len(df)),
-                    format_func=lambda x: f"Record {x+1} - {df.iloc[x]['timestamp']}"
-                )
-                
-                if selected_index is not None:
-                    record = df.iloc[selected_index]
-                    with st.expander(f"📄 Details for {record['timestamp']}", expanded=True):
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            # Show original image
-                            image_path = f"history_images/{record['image_id']}.jpg"
-                            if os.path.exists(image_path):
-                                st.image(image_path, caption="Original Image", use_column_width=True)
-                            else:
-                                st.warning("Original image not found")
-                            
-                        with col2:
-                            # Show emotion analysis
-                            st.write(f"**Location:** {record['location']}")
-                            st.write(f"**Timestamp:** {record['timestamp']}")
-                            
-                            # Create pie chart for this image's emotions
-                            emotions = record['all_emotions'].split(',')
-                            confidences = list(map(float, record['all_confidences'].split(',')))
-                            
-                            fig = px.pie(
-                                names=emotions,
-                                values=confidences,
-                                title="Emotion Distribution for This Image"
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No history file found.")
-    except Exception as e:
-        st.warning(f"Error loading history records: {e}")
+            st.warning(f"Error loading history records: {e}")
 
     with tabs[3]:
         st.subheader("📊 Emotion Analysis Chart")
