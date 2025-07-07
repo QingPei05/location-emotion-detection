@@ -188,49 +188,117 @@ def main_app():
     tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
 
     with tabs[0]:
-    uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-    if uploaded_file:
-        try:
-            image = Image.open(uploaded_file)
-            img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            detections = detector.detect_emotions(img)
-            detected_img = detector.draw_detections(img, detections)
-            
-            # Generate unique ID for this image
-            image_id = hashlib.md5(uploaded_file.getvalue()).hexdigest()
-            
-            # Detect location from image (implementation below)
-            location = detect_location(img)  
-            
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                st.subheader("🔍 Detection Results")
-                if detections:
-                    emotions = [d["emotion"] for d in detections]
-                    confidences = [d["confidence"] for d in detections]
-                    
-                    # Correct pluralization
-                    face_word = "face" if len(detections) == 1 else "faces"
-                    st.success(f"🎭 {len(detections)} {face_word} detected")
-                    
-                    for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-                        st.write(f"- Face {i + 1}: {emo} ({conf}%)")
-                    
-                    # Display detected location
-                    st.write(f"📍 Location: {location if location else 'Unknown'}")
-                    
-                    show_detection_guide()
-                    save_history(username, image_id, emotions, confidences, location if location else "Unknown")
+        uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+        if uploaded_file:
+            try:
+                image = Image.open(uploaded_file)
+                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                detections = detector.detect_emotions(img)
+                detected_img = detector.draw_detections(img, detections)
 
-            with col2:
-                t1, t2 = st.tabs(["Original Image", "Processed Image"])
-                with t1:
-                    st.image(image, use_column_width=True)
-                with t2:
-                    st.image(detected_img, channels="BGR", use_column_width=True,
-                            caption=f"Detected {len(detections)} {face_word}")
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.subheader("🔍 Detection Results")
+                    if detections:
+                        emotions = [d["emotion"] for d in detections]
+                        confidences = [d["confidence"] for d in detections]
+                        
+                        # Correct pluralization
+                        face_word = "face" if len(detections) == 1 else "faces"
+                        st.success(f"🎭 {len(detections)} {face_word} detected")
+                        
+                        for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                            st.write(f"- Face {i + 1}: {emo} ({conf}%)")
+                        show_detection_guide()
+                        save_history(username, emotions, confidences, "Unknown")
+                    else:
+                        st.warning("No faces were detected in the uploaded image.")
+                with col2:
+                    t1, t2 = st.tabs(["Original Image", "Processed Image"])
+                    with t1:
+                        st.image(image, use_column_width=True)
+                    with t2:
+                        st.image(detected_img, channels="BGR", use_column_width=True,
+                                caption=f"Detected {len(detections)} {face_word}")
+            except Exception as e:
+                st.error(f"Error while processing the image: {e}")
+
+    with tabs[1]:
+        st.subheader("🗺️ Random Location Sample (Demo)")
+        st.map(pd.DataFrame({
+            'lat': [3.139 + random.uniform(-0.01, 0.01)],
+            'lon': [101.6869 + random.uniform(-0.01, 0.01)]
+        }))
+        st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
+
+    with tabs[2]:
+    st.subheader("📜 Upload History")
+    try:
+        if os.path.exists("history.csv"):
+            df = pd.read_csv("history.csv")
+            if df.empty:
+                st.info("No upload records found.")
+            else:
+                # Display simplified history table
+                st.dataframe(df[["location", "emotions", "timestamp"]], 
+                            use_container_width=True)
+                
+                # Add selection functionality
+                selected_index = st.selectbox(
+                    "Select a record to view details:",
+                    range(len(df)),
+                    format_func=lambda x: f"Record {x+1} - {df.iloc[x]['timestamp']}"
+                )
+                
+                if selected_index is not None:
+                    record = df.iloc[selected_index]
+                    with st.expander(f"📄 Details for {record['timestamp']}", expanded=True):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Show original image
+                            image_path = f"history_images/{record['image_id']}.jpg"
+                            if os.path.exists(image_path):
+                                st.image(image_path, caption="Original Image", use_column_width=True)
+                            else:
+                                st.warning("Original image not found")
+                            
+                        with col2:
+                            # Show emotion analysis
+                            st.write(f"**Location:** {record['location']}")
+                            st.write(f"**Timestamp:** {record['timestamp']}")
+                            
+                            # Create pie chart for this image's emotions
+                            emotions = record['all_emotions'].split(',')
+                            confidences = list(map(float, record['all_confidences'].split(',')))
+                            
+                            fig = px.pie(
+                                names=emotions,
+                                values=confidences,
+                                title="Emotion Distribution for This Image"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No history file found.")
+    except Exception as e:
+        st.warning(f"Error loading history records: {e}")
+
+    with tabs[3]:
+        st.subheader("📊 Emotion Analysis Chart")
+        try:
+            if os.path.exists("history.csv"):
+                df = pd.read_csv("history.csv")
+                if df.empty:
+                    st.info("No emotion records found.")
+                else:
+                    fig = px.pie(df, names="Emotion", title="Emotion Distribution")
+                    st.plotly_chart(fig)
+                    st.caption("Chart shows distribution of all detected emotions")
+            else:
+                st.info("No history file found.")
         except Exception as e:
-            st.error(f"Error while processing the image: {e}")
+            st.error(f"Error generating chart: {e}")
+
 
 # Add this function to your app.py (place it with your other utility functions)
 def detect_location(img):
