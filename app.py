@@ -3,141 +3,155 @@ import cv2
 import numpy as np
 from PIL import Image
 import pandas as pd
+from datetime import datetime
+import random
 import os
-import time
-from configs.settings import settings
-from configs.translations import TRANSLATIONS
-from modules.detector import EnhancedEmotionDetector
-from modules.utils import save_history, load_history
+import plotly.express as px
+from emotion_utils.detector import EmotionDetector
 
-# ----------------- 初始化设置 -----------------
+# ----------------- App Configuration -----------------
 st.set_page_config(
-    page_title="AI Emotion Detector Pro",
-    page_icon="😊",
+    page_title="AI Emotion & Location Detector",
+    page_icon="👁‍🗨",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ----------------- 多语言支持 -----------------
-lang = st.sidebar.selectbox(
-    "🌐 Language",
-    options=settings.AVAILABLE_LANGS,
-    index=settings.AVAILABLE_LANGS.index(settings.DEFAULT_LANGUAGE)
-)
-T = TRANSLATIONS[lang]
-
-# ----------------- 初始化检测器 -----------------
 @st.cache_resource
 def get_detector():
-    detector = EnhancedEmotionDetector()
-    return detector
+    return EmotionDetector()
 
 detector = get_detector()
 
-# ----------------- 主界面 -----------------
-def main():
-    st.title(f"😊 {T['title']}")
-    st.caption(T['upload_guide'])
-    
-    # 用户认证
-    username = st.text_input(f"👤 {T['username']}", value="user01")
-    
-    # 设置面板
-    with st.expander("⚙️ " + T['settings'], expanded=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            min_conf = st.slider(
-                T['min_conf'],
-                0.1, 1.0, float(detector.min_confidence), 0.05)
-        with col2:
-            detector_backend = st.selectbox(
-                T['detector'],
-                options=settings.DETECTOR_BACKENDS,
-                index=settings.DETECTOR_BACKENDS.index(detector.detector_backend))
-        
-        detector.min_confidence = min_conf
-        detector.detector_backend = detector_backend
-    
-    # 文件上传
-    uploaded_file = st.file_uploader(T['upload_image'], type=["jpg", "png", "jpeg"])
-    
-    if uploaded_file:
-        try:
-            # 读取图片
-            image = Image.open(uploaded_file)
-            img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            
-            # 检测情绪
-            with st.spinner(T['analyzing']):
-                start_time = time.time()
-                detections = detector.detect_emotions(img)
-                process_time = time.time() - start_time
-                
-                if detections:
-                    detected_img = detector.draw_detections(img, detections)
-            
-            # 显示结果
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.subheader(T['analysis_results'])
-                if detections:
-                    st.success(f"✅ Detected {len(detections)} face(s) in {process_time:.2f}s")
-                    
-                    for i, det in enumerate(detections):
-                        st.markdown(f"""
-                        **Face {i+1}**
-                        - **{T['detected_emotion']}**: `{det['emotion']}`
-                        - **{T['confidence']}**: `{det['confidence']}%`
-                        - Face Confidence: `{det['face_confidence']}%`
-                        - Position: `({det['x']}, {det['y']})`
-                        - Size: `{det['w']}x{det['h']}`
-                        """)
-                    
-                    # 保存结果
-                    save_history({
-                        "username": username,
-                        "emotion": detections[0]["emotion"],
-                        "confidence": detections[0]["confidence"],
-                        "face_confidence": detections[0]["face_confidence"],
-                        "image_size": f"{image.width}x{image.height}",
-                        "detector": detector.detector_backend,
-                        "models": detector.models
-                    })
-                else:
-                    st.warning(T['no_faces'])
-            
-            with col2:
-                if detections:
-                    tab1, tab2 = st.tabs([T['original'], T['processed']])
-                    with tab1:
-                        st.image(image, use_column_width=True)
-                    with tab2:
-                        st.image(detected_img, channels="BGR", use_column_width=True)
-                else:
-                    st.image(image, caption=T['original'], use_column_width=True)
-        
-        except Exception as e:
-            st.error(f"{T['error_processing']}: {str(e)}")
-    
-    # 历史记录
-    st.divider()
-    st.subheader(f"📜 {T['history']}")
-    
+def save_history(username, emotion, confidence, location="Unknown"):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df = pd.DataFrame([[username, emotion, confidence, location, now]], 
+                     columns=["Username","Emotion","Confidence","Location","timestamp"])
+    try:
+        if os.path.exists("history.csv"):
+            prev = pd.read_csv("history.csv")
+            df = pd.concat([prev, df])
+        df.to_csv("history.csv", index=False)
+    except Exception as e:
+        st.error(f"Failed to save history: {e}")
+
+def show_detection_guide():
+    with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
+        st.markdown("""
+        *Detection Logic Explained:*
+        - 😊 Happy: Smile present, cheeks raised
+        - 😠 Angry: Eyebrows lowered, eyes wide open
+        - 😐 Neutral: No strong facial movements
+        - 😢 Sad: Eyebrows raised, lip corners down
+        - 😲 Surprise: Eyebrows raised, mouth open
+        - 😨 Fear: Eyes tense, lips stretched
+        - 🤢 Disgust: Nose wrinkled, upper lip raised
+
+        *Tips for Better Results:*
+        - Use clear, front-facing images
+        - Ensure good lighting
+        - Avoid obstructed faces
+        """)
+
+def sidebar_design(username):
     if username:
-        history_df = load_history(username)
-        if not history_df.empty:
-            st.dataframe(history_df)
-            
-            # 情绪分布图表
-            st.plotly_chart(
-                px.pie(history_df, names="emotion", title="Emotion Distribution"),
-                use_container_width=True
-            )
+        st.sidebar.success(f"👤 Logged in as: {username}")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("## Quick Navigation")
+    st.sidebar.markdown("- Upload and detect emotions")
+    st.sidebar.markdown("- View and filter upload history")
+    st.sidebar.markdown("- Visualize your emotion distribution")
+    st.sidebar.divider()
+    st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
+  
+def main():
+    st.title("👁‍🗨 AI Emotion & Location Detector")
+    st.caption("Upload a photo to detect facial emotions and estimate location.")
+    tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
+
+    with tabs[0]:
+        username = st.text_input("👤 Enter your username")
+        sidebar_design(username)
+        if username:
+            uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+            if uploaded_file:
+                try:
+                    image = Image.open(uploaded_file)
+                    img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                    detections = detector.detect_emotions(img)
+                    detected_img = detector.draw_detections(img, detections)
+
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        st.subheader("🔍 Detection Results")
+                        if detections:
+                            emotions = [d["emotion"] for d in detections]
+                            confidences = [d["confidence"] for d in detections]
+                            st.success(f"🎭 {len(detections)} face(s) detected")
+                            for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                                st.write(f"- Face {i + 1}: {emo} ({conf}%)")
+                            show_detection_guide()
+                            save_history(username, emotions[0], confidences[0], "Unknown")
+                        else:
+                            st.warning("No faces were detected in the uploaded image.")
+                    with col2:
+                        t1, t2 = st.tabs(["Original Image", "Processed Image"])
+                        with t1:
+                            st.image(image, use_container_width=True)
+                        with t2:
+                            st.image(detected_img, channels="BGR", use_container_width=True,
+                                     caption=f"Detected {len(detections)} face(s)")
+                except Exception as e:
+                    st.error(f"Error while processing the image: {e}")
+
+    with tabs[1]:
+        st.subheader("🗺️ Random Location Sample (Demo)")
+        st.map(pd.DataFrame({
+            'lat': [3.139 + random.uniform(-0.01, 0.01)],
+            'lon': [101.6869 + random.uniform(-0.01, 0.01)]
+        }))
+        st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
+
+    with tabs[2]:
+        st.subheader("📜 Upload History")
+        if username:
+            try:
+                if os.path.exists("history.csv"):
+                    df = pd.read_csv("history.csv")
+                    if df.empty:
+                        st.info("No upload records found.")
+                    else:
+                        df_filtered = df[df["Username"].str.contains(username, case=False)]
+                        df_filtered = df_filtered.sort_values("timestamp", ascending=False).reset_index(drop=True)
+                        df_filtered.index = range(1, len(df_filtered)+1)
+                        st.dataframe(df_filtered)
+                        st.caption(f"Total records found for {username}: {len(df_filtered)}")
+                else:
+                    st.info("No history file found.")
+            except:
+                st.warning("Error loading history records.")
         else:
-            st.info("No history records found")
-    else:
-        st.warning("Please enter username to view history")
+            st.warning("Please enter your username to view your upload history.")
+
+    with tabs[3]:
+        st.subheader("📊 Emotion Analysis Chart")
+        if username:
+            try:
+                if os.path.exists("history.csv"):
+                    df = pd.read_csv("history.csv")
+                    df_filtered = df[df["Username"].str.contains(username, case=False)]
+                    if not df_filtered.empty:
+                        fig = px.pie(df_filtered, names="Emotion", title=f"Emotion Distribution for {username}")
+                        st.plotly_chart(fig)
+                        st.caption("Chart is based on your personal upload history.")
+                    else:
+                        st.info("No emotion records found for this username.")
+                else:
+                    st.info("History file not found.")
+            except Exception as e:
+                st.error(f"Error generating chart: {e}")
+        else:
+            st.warning("Please enter your username to generate your emotion chart.")
 
 if __name__ == "__main__":
     main()
