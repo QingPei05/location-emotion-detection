@@ -80,6 +80,42 @@ def save_history(username, emotions, confidences, location="Unknown"):
     except Exception as e:
         st.error(f"Failed to save history: {e}")
 
+def show_detection_guide():
+    with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
+        st.markdown("""
+        *Detection Logic Explained:*
+        - 😊 Happy: Smile present, cheeks raised
+        - 😠 Angry: Eyebrows lowered, eyes wide open
+        - 😐 Neutral: No strong facial movements
+        - 😢 Sad: Eyebrows raised, lip corners down
+        - 😲 Surprise: Eyebrows raised, mouth open
+        - 😨 Fear: Eyes tense, lips stretched
+        - 🤢 Disgust: Nose wrinkled, upper lip raised
+
+        *Tips for Better Results:*
+        - Use clear, front-facing images
+        - Ensure good lighting
+        - Avoid obstructed faces
+        """)
+
+def sidebar_design(username):
+    """Design the sidebar with user info and navigation"""
+    if username:  # Only show if username exists
+        st.sidebar.success(f"👤 Logged in as: {username}")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("## Quick Navigation")
+    st.sidebar.markdown("- Upload and detect emotions")
+    st.sidebar.markdown("- View and filter upload history")
+    st.sidebar.markdown("- Visualize your emotion distribution")
+    st.sidebar.divider()
+    st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
+    
+    # Add logout button
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.rerun()
+
 # ----------------- Login/Signup Pages -----------------
 def login_page():
     st.title("👤 Sign In")
@@ -164,6 +200,14 @@ def main_app():
             except Exception as e:
                 st.error(f"Error while processing the image: {e}")
 
+    with tabs[1]:
+        st.subheader("🗺️ Random Location Sample (Demo)")
+        st.map(pd.DataFrame({
+            'lat': [3.139 + random.uniform(-0.01, 0.01)],
+            'lon': [101.6869 + random.uniform(-0.01, 0.01)]
+        }))
+        st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
+
     with tabs[2]:
         st.subheader("📜 Upload History")
         try:
@@ -173,24 +217,41 @@ def main_app():
                     st.info("No upload records found.")
                 else:
                     # Display the history without username
-                    st.dataframe(df[["Location", "Emotion", "Confidence", "timestamp"]])
+                    edited_df = st.data_editor(
+                        df[["Location", "Emotion", "Confidence", "timestamp"]],
+                        key="history_editor"
+                    )
                     
-                    # Add click functionality to show details
-                    selected_indices = st.session_state.get("selected_indices", [])
-                    selected_rows = df.iloc[selected_indices]
-                    
-                    for _, row in selected_rows.iterrows():
-                        with st.expander(f"Details for record from {row['timestamp']}"):
-                            st.write(f"Location: {row['Location']}")
-                            st.write(f"Emotion: {row['Emotion']}")
-                            st.write(f"Confidence: {row['Confidence']}%")
-                            st.write(f"Timestamp: {row['timestamp']}")
+                    # Show details when row is selected
+                    if "history_editor" in st.session_state:
+                        selected_rows = st.session_state.history_editor["edited_rows"]
+                        for idx, changes in selected_rows.items():
+                            if changes:
+                                with st.expander(f"Details for record {idx+1}"):
+                                    st.write(f"Location: {df.iloc[idx]['Location']}")
+                                    st.write(f"Emotion: {df.iloc[idx]['Emotion']}")
+                                    st.write(f"Confidence: {df.iloc[idx]['Confidence']}%")
+                                    st.write(f"Timestamp: {df.iloc[idx]['timestamp']}")
             else:
                 st.info("No history file found.")
-        except:
-            st.warning("Error loading history records.")
+        except Exception as e:
+            st.warning(f"Error loading history records: {e}")
 
-    # ... rest of your existing tab code remains the same ...
+    with tabs[3]:
+        st.subheader("📊 Emotion Analysis Chart")
+        try:
+            if os.path.exists("history.csv"):
+                df = pd.read_csv("history.csv")
+                if df.empty:
+                    st.info("No emotion records found.")
+                else:
+                    fig = px.pie(df, names="Emotion", title="Emotion Distribution")
+                    st.plotly_chart(fig)
+                    st.caption("Chart shows distribution of all detected emotions")
+            else:
+                st.info("No history file found.")
+        except Exception as e:
+            st.error(f"Error generating chart: {e}")
 
 # ----------------- Run App -----------------
 if __name__ == "__main__":
