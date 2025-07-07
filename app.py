@@ -193,9 +193,9 @@ def main_app():
                 with col2:
                     t1, t2 = st.tabs(["Original Image", "Processed Image"])
                     with t1:
-                        st.image(image, use_column_width=True)
+                        st.image(image, use_container_width=True)
                     with t2:
-                        st.image(detected_img, channels="BGR", use_column_width=True,
+                        st.image(detected_img, channels="BGR", use_container_width=True,
                                 caption=f"Detected {len(detections)} {face_word}")
             except Exception as e:
                 st.error(f"Error while processing the image: {e}")
