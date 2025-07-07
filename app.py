@@ -27,19 +27,28 @@ def authenticate(username, password):
 def register_user(username, password):
     """Register new user"""
     try:
-        hashed_password = hashlib.sha256(password.encode()).hexdigest()
-        df = pd.DataFrame([[username, hashed_password]], 
-                         columns=["username", "password"])
-        
+        # Check if username already exists
         if os.path.exists("users.csv"):
             users = pd.read_csv("users.csv")
             if username in users["username"].values:
                 return False
-            df = pd.concat([users, df])
         
-        df.to_csv("users.csv", index=False)
+        # Hash the password
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        
+        # Create new user record
+        new_user = pd.DataFrame([[username, hashed_password]], 
+                              columns=["username", "password"])
+        
+        # Append to existing users or create new file
+        if os.path.exists("users.csv"):
+            new_user.to_csv("users.csv", mode='a', header=False, index=False)
+        else:
+            new_user.to_csv("users.csv", index=False)
+            
         return True
-    except:
+    except Exception as e:
+        print(f"Registration error: {e}")
         return False
 
 # ----------------- App Configuration -----------------
