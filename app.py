@@ -116,6 +116,155 @@ def sidebar_design(username):
         st.session_state.username = ""
         st.rerun()
 
+import streamlit as st
+import cv2
+import numpy as np
+from PIL import Image
+import pandas as pd
+from datetime import datetime
+import random
+import os
+import plotly.express as px
+from emotion_utils.detector import EmotionDetector
+import hashlib
+
+# ----------------- User Authentication -----------------
+def authenticate(username, password):
+    """Check if username and password match"""
+    try:
+        if os.path.exists("users.csv"):
+            users = pd.read_csv("users.csv")
+            user_record = users[users["username"] == username]
+            if not user_record.empty:
+                hashed_password = hashlib.sha256(password.encode()).hexdigest()
+                return user_record["password"].values[0] == hashed_password
+        return False
+    except:
+        return False
+
+def register_user(username, password):
+    """Register new user"""
+    try:
+        # Check if username already exists
+        if os.path.exists("users.csv"):
+            users = pd.read_csv("users.csv")
+            if username in users["username"].values:
+                return False
+        
+        # Hash the password
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        
+        # Create new user record
+        new_user = pd.DataFrame([[username, hashed_password]], 
+                              columns=["username", "password"])
+        
+        # Append to existing users or create new file
+        if os.path.exists("users.csv"):
+            new_user.to_csv("users.csv", mode='a', header=False, index=False)
+        else:
+            new_user.to_csv("users.csv", index=False)
+            
+        return True
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return False
+
+# ----------------- App Configuration -----------------
+st.set_page_config(
+    page_title="AI Emotion & Location Detector",
+    page_icon="👁‍🗨",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+@st.cache_resource
+def get_detector():
+    return EmotionDetector()
+
+detector = get_detector()
+
+def save_history(username, emotions, confidences, location="Unknown"):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    records = []
+    for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+        records.append([location, emo, conf, now])
+    
+    df = pd.DataFrame(records, columns=["Location", "Emotion", "Confidence", "timestamp"])
+    try:
+        if os.path.exists("history.csv"):
+            prev = pd.read_csv("history.csv")
+            df = pd.concat([prev, df])
+        df.to_csv("history.csv", index=False)
+    except Exception as e:
+        st.error(f"Failed to save history: {e}")
+
+def show_detection_guide():
+    with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
+        st.markdown("""
+        *Detection Logic Explained:*
+        - 😊 Happy: Smile present, cheeks raised
+        - 😠 Angry: Eyebrows lowered, eyes wide open
+        - 😐 Neutral: No strong facial movements
+        - 😢 Sad: Eyebrows raised, lip corners down
+        - 😲 Surprise: Eyebrows raised, mouth open
+        - 😨 Fear: Eyes tense, lips stretched
+        - 🤢 Disgust: Nose wrinkled, upper lip raised
+
+        *Tips for Better Results:*
+        - Use clear, front-facing images
+        - Ensure good lighting
+        - Avoid obstructed faces
+        """)
+
+def sidebar_design(username):
+    """Design the sidebar with user info and navigation"""
+    if username:  # Only show if username exists
+        st.sidebar.success(f"👤 Logged in as: {username}")
+    
+    # History section in sidebar
+    if username and os.path.exists("history.csv"):
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("## History Records")
+        
+        try:
+            df = pd.read_csv("history.csv")
+            if not df.empty:
+                # Filter for current user's records only
+                user_history = df.copy()  # In your current code, history doesn't store username
+                
+                # Display table on left, chart on right
+                tab1, tab2 = st.sidebar.tabs(["Table", "Chart"])
+                
+                with tab1:
+                    # Display with index starting at 1
+                    st.dataframe(
+                        user_history[["Location", "Emotion", "timestamp"]].reset_index(drop=True).rename_axis('No.').assign(No.=lambda x: x.index + 1).set_index('No.'),
+                        use_container_width=True,
+                        hide_index=False
+                    )
+                
+                with tab2:
+                    if not user_history.empty:
+                        fig = px.pie(user_history, names="Emotion", title="Your Emotion Distribution")
+                        st.plotly_chart(fig, use_container_width=True)
+        
+        except Exception as e:
+            st.sidebar.warning(f"Error loading history: {e}")
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("## Quick Navigation")
+    st.sidebar.markdown("- Upload and detect emotions")
+    st.sidebar.markdown("- View location map")
+    st.sidebar.markdown("- Analyze emotion trends")
+    st.sidebar.divider()
+    
+    # Add logout button at bottom
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.rerun()
+
+
 # ----------------- Login/Signup Pages -----------------
 def login_page():
     st.title("👤 Sign In")
@@ -153,6 +302,86 @@ def signup_page():
     if st.button("Back to Sign In"):
         st.session_state["show_signup"] = False
         st.rerun()
+
+# ----------------- Main App -----------------
+def main_app():
+    username = st.session_state.get("username", "")
+    sidebar_design(username)
+    
+    st.title("👁‍🗨 AI Emotion & Location Detector")
+    st.caption("Upload a photo to detect facial emotions and estimate location.")
+    
+    tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📊 Emotion Analysis"])
+
+    with tabs[0]:
+        uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+        if uploaded_file:
+            try:
+                image = Image.open(uploaded_file)
+                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                detections = detector.detect_emotions(img)
+                detected_img = detector.draw_detections(img, detections)
+
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.subheader("🔍 Detection Results")
+                    if detections:
+                        emotions = [d["emotion"] for d in detections]
+                        confidences = [d["confidence"] for d in detections]
+                        
+                        # Count emotion occurrences
+                        emotion_counts = {}
+                        for emo in emotions:
+                            emotion_counts[emo] = emotion_counts.get(emo, 0) + 1
+                        
+                        # Format total emotions string
+                        total_str = ", ".join([f"{count} {emo}" for emo, count in emotion_counts.items()])
+                        
+                        face_word = "face" if len(detections) == 1 else "faces"
+                        st.success(f"🎭 {len(detections)} {face_word} detected")
+                        
+                        for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                            st.write(f"- Face {i + 1}: {emo} ({conf}%)")
+                        
+                        # Add total emotions count
+                        st.markdown(f"**Total:** {total_str}")
+                        
+                        show_detection_guide()
+                        
+                        # Generate unique ID for this image
+                        image_id = hashlib.md5(uploaded_file.getvalue()).hexdigest()
+                        
+                        # Save all emotions and image
+                        save_history(username, emotions, confidences, "Unknown")
+                        
+                with col2:
+                    st.image(image, use_column_width=True, caption="Original Image")
+                    
+            except Exception as e:
+                st.error(f"Error while processing the image: {e}")
+
+# ----------------- Run App -----------------
+if __name__ == "__main__":
+    # Initialize session state variables
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "show_signup" not in st.session_state:
+        st.session_state.show_signup = False
+    if "username" not in st.session_state:
+        st.session_state.username = ""
+
+    # Authentication flow
+    if not st.session_state.logged_in:
+        if st.session_state.show_signup:
+            signup_page()
+        else:
+            login_page()
+    else:
+        try:
+            main_app()
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            st.stop()
 
 # ----------------- Main App -----------------
 def main_app():
