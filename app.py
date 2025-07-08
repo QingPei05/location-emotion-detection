@@ -111,6 +111,10 @@ def sidebar_design(username):
             if os.path.exists("history.csv"):
                 df = pd.read_csv("history.csv")
                 if not df.empty:
+                    # Ensure username column exists
+                    if 'username' not in df.columns:
+                        df['username'] = username  # Add username column if missing
+                    
                     # Filter for current user only
                     user_df = df[df["username"] == username]
                     
@@ -149,7 +153,6 @@ def sidebar_design(username):
     st.sidebar.markdown("## Quick Navigation")
     st.sidebar.markdown("- Upload and detect emotions")
     st.sidebar.markdown("- View location map")
-    st.sidebar.markdown("- Analyze emotion trends")
     st.sidebar.divider()
     st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
     
