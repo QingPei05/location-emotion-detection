@@ -210,33 +210,33 @@ def main_app():
     tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
 
     with tabs[0]:
-    uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-    if uploaded_file:
-        try:
-            image = Image.open(uploaded_file)
-            img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            detections = detector.detect_emotions(img)
-            detected_img = detector.draw_detections(img, detections)
+        uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+        if uploaded_file:
+            try:
+                image = Image.open(uploaded_file)
+                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                detections = detector.detect_emotions(img)
+                detected_img = detector.draw_detections(img, detections)
 
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                st.subheader("🔍 Detection Results")
-                if detections:
-                    emotions = [d["emotion"] for d in detections]
-                    confidences = [d["confidence"] for d in detections]
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.subheader("🔍 Detection Results")
+                    if detections:
+                        emotions = [d["emotion"] for d in detections]
+                        confidences = [d["confidence"] for d in detections]
 
-                    # 显示每种情绪的总数
-                    emotion_count = {emo: emotions.count(emo) for emo in set(emotions)}
-                    total_summary = ", ".join([f"{count} {emo}" for emo, count in emotion_count.items()])
-                    st.success(f"🎭 {len(detections)} faces detected. Total: {total_summary}")
+                        # 显示每种情绪的总数
+                        emotion_count = {emo: emotions.count(emo) for emo in set(emotions)}
+                        total_summary = ", ".join([f"{count} {emo}" for emo, count in emotion_count.items()])
+                        st.success(f"🎭 {len(detections)} faces detected. Total: {total_summary}")
                     
-                    for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-                        st.write(f"- Face {i + 1}: {emo} ({conf}%)")
-                    save_history(username, emotions, confidences, "Unknown")
-                else:
-                    st.warning("No faces were detected in the uploaded image.")
-            with col2:
-                st.image(detected_img, channels="BGR", use_column_width=True)
+                        for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                            st.write(f"- Face {i + 1}: {emo} ({conf}%)")
+                        save_history(username, emotions, confidences, "Unknown")
+                    else:
+                        st.warning("No faces were detected in the uploaded image.")
+                with col2:
+                    st.image(detected_img, channels="BGR", use_column_width=True)
 
     with tabs[1]:
         st.subheader("🗺️ Random Location Sample (Demo)")
