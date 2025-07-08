@@ -81,9 +81,9 @@ def save_history(username, emotions, confidences, location="Unknown"):
         st.error(f"Failed to save history: {e}")
 
 def show_detection_guide():
-    with st.expander("ℹ How Emotion Detection Works", expanded=False):
+    with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
         st.markdown("""
-        Detection Logic Explained:
+        *Detection Logic Explained:*
         - 😊 Happy: Smile present, cheeks raised
         - 😠 Angry: Eyebrows lowered, eyes wide open
         - 😐 Neutral: No strong facial movements
@@ -92,7 +92,7 @@ def show_detection_guide():
         - 😨 Fear: Eyes tense, lips stretched
         - 🤢 Disgust: Nose wrinkled, upper lip raised
 
-        Tips for Better Results:
+        *Tips for Better Results:*
         - Use clear, front-facing images
         - Ensure good lighting
         - Avoid obstructed faces
@@ -162,7 +162,7 @@ def main_app():
     st.title("👁‍🗨 AI Emotion & Location Detector")
     st.caption("Upload a photo to detect facial emotions and estimate location.")
     
-    tabs = st.tabs(["🏠 Home", "🗺 Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
+    tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
 
     with tabs[0]:
         uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
@@ -201,7 +201,7 @@ def main_app():
                 st.error(f"Error while processing the image: {e}")
 
     with tabs[1]:
-        st.subheader("🗺 Random Location Sample (Demo)")
+        st.subheader("🗺️ Random Location Sample (Demo)")
         st.map(pd.DataFrame({
             'lat': [3.139 + random.uniform(-0.01, 0.01)],
             'lon': [101.6869 + random.uniform(-0.01, 0.01)]
@@ -254,7 +254,7 @@ def main_app():
             st.error(f"Error generating chart: {e}")
 
 # ----------------- Run App -----------------
-if _name_ == "_main_":
+if __name__ == "__main__":
     # Initialize session state variables
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
