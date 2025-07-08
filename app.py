@@ -102,13 +102,48 @@ def sidebar_design(username):
     """Design the sidebar with user info and navigation"""
     if username:  # Only show if username exists
         st.sidebar.success(f"👤 Logged in as: {username}")
+
+        # 显示历史记录
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📜 Upload History")
+        if os.path.exists("history.csv"):
+            df = pd.read_csv("history.csv")
+            user_history = df[df["username"] == username]  # 只显示该用户的历史记录
+            
+            if user_history.empty:
+                st.sidebar.info("No upload records found.")
+            else:
+                edited_df = st.sidebar.data_editor(
+                    user_history[["Location", "Emotion", "Confidence", "timestamp"]],
+                    key="history_editor",
+                    disabled=True  # 禁用编辑
+                )
+                # 在侧边栏显示图表
+                fig = px.pie(user_history, names="Emotion", title="Emotion Distribution")
+                st.sidebar.plotly_chart(fig)
+
+        else:
+            st.sidebar.info("No history file found.")
     st.sidebar.markdown("---")
     st.sidebar.markdown("## Quick Navigation")
     st.sidebar.markdown("- Upload and detect emotions")
-    st.sidebar.markdown("- View and filter upload history")
     st.sidebar.markdown("- Visualize your emotion distribution")
     st.sidebar.divider()
-    st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
+
+# 在Main App中显示选中的记录的详细信息
+if "history_editor" in st.session_state:
+    selected_rows = st.session_state.history_editor["edited_rows"]
+    for idx in selected_rows:
+        with st.expander(f"Details for record {idx + 1}"):
+            row_data = user_history.iloc[idx]
+            st.image(row_data['image_path'], use_column_width=True)  # 假设您存储了图像路径
+            st.write(f"Location: {row_data['Location']}")
+            st.write(f"Emotion: {row_data['Emotion']}")
+            st.write(f"Timestamp: {row_data['timestamp']}")
+            # 显示情绪图表
+            emotion_chart_data = user_history[user_history["timestamp"] == row_data['timestamp']]
+            fig = px.pie(emotion_chart_data, names="Emotion", title="Emotion Distribution for this Record")
+            st.plotly_chart(fig)
     
     # Add logout button
     if st.sidebar.button("🚪 Logout"):
@@ -118,9 +153,10 @@ def sidebar_design(username):
 
 # ----------------- Login/Signup Pages -----------------
 def login_page():
-    st.title("👤 Sign In")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    st.markdown("<h1 style='text-align: center;'>AI Emotion & Location Detector</h1>", unsafe_allow_html=True)
+    st.subheader("👤 Sign In")
+    username = st.text_input("Username", key="login_username")
+    password = st.text_input("Password", type="password", key="login_password")
     
     if st.button("Sign In"):
         if authenticate(username, password):
@@ -129,13 +165,18 @@ def login_page():
             st.rerun()
         else:
             st.error("Invalid username or password")
-    
-    if st.button("Sign Up"):
-        st.session_state["show_signup"] = True
-        st.rerun()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Sign Up"):
+            st.session_state["show_signup"] = True
+            st.rerun()
+    with col2:
+        st.button("Enter", on_click=lambda: authenticate(username, password))
 
 def signup_page():
-    st.title("👤 Sign Up")
+    st.markdown("<h1 style='text-align: center;'>AI Emotion & Location Detector</h1>", unsafe_allow_html=True)
+    st.subheader("👤 Sign Up")
     username = st.text_input("Choose a username")
     password = st.text_input("Choose a password", type="password")
     confirm_password = st.text_input("Confirm password", type="password")
@@ -150,9 +191,13 @@ def signup_page():
         else:
             st.error("Username already exists or registration failed")
     
-    if st.button("Back to Sign In"):
-        st.session_state["show_signup"] = False
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Back to Sign In"):
+            st.session_state["show_signup"] = False
+            st.rerun()
+    with col2:
+        st.button("Enter", on_click=lambda: register_user(username, password))
 
 # ----------------- Main App -----------------
 def main_app():
@@ -165,40 +210,33 @@ def main_app():
     tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
 
     with tabs[0]:
-        uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-        if uploaded_file:
-            try:
-                image = Image.open(uploaded_file)
-                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-                detections = detector.detect_emotions(img)
-                detected_img = detector.draw_detections(img, detections)
+    uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+    if uploaded_file:
+        try:
+            image = Image.open(uploaded_file)
+            img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            detections = detector.detect_emotions(img)
+            detected_img = detector.draw_detections(img, detections)
 
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    st.subheader("🔍 Detection Results")
-                    if detections:
-                        emotions = [d["emotion"] for d in detections]
-                        confidences = [d["confidence"] for d in detections]
-                        
-                        # Correct pluralization
-                        face_word = "face" if len(detections) == 1 else "faces"
-                        st.success(f"🎭 {len(detections)} {face_word} detected")
-                        
-                        for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-                            st.write(f"- Face {i + 1}: {emo} ({conf}%)")
-                        show_detection_guide()
-                        save_history(username, emotions, confidences, "Unknown")
-                    else:
-                        st.warning("No faces were detected in the uploaded image.")
-                with col2:
-                    t1, t2 = st.tabs(["Original Image", "Processed Image"])
-                    with t1:
-                        st.image(image, use_column_width=True)
-                    with t2:
-                        st.image(detected_img, channels="BGR", use_column_width=True,
-                                caption=f"Detected {len(detections)} {face_word}")
-            except Exception as e:
-                st.error(f"Error while processing the image: {e}")
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.subheader("🔍 Detection Results")
+                if detections:
+                    emotions = [d["emotion"] for d in detections]
+                    confidences = [d["confidence"] for d in detections]
+
+                    # 显示每种情绪的总数
+                    emotion_count = {emo: emotions.count(emo) for emo in set(emotions)}
+                    total_summary = ", ".join([f"{count} {emo}" for emo, count in emotion_count.items()])
+                    st.success(f"🎭 {len(detections)} faces detected. Total: {total_summary}")
+                    
+                    for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                        st.write(f"- Face {i + 1}: {emo} ({conf}%)")
+                    save_history(username, emotions, confidences, "Unknown")
+                else:
+                    st.warning("No faces were detected in the uploaded image.")
+            with col2:
+                st.image(detected_img, channels="BGR", use_column_width=True)
 
     with tabs[1]:
         st.subheader("🗺️ Random Location Sample (Demo)")
