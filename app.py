@@ -165,10 +165,10 @@ def main_app():
     
     tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📊 Emotion Analysis Chart"])
 
-    with tabs[0]:
-        uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-        if uploaded_file:
-            try:
+    try:
+        with tabs[0]:
+            uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+            if uploaded_file:
                 image = Image.open(uploaded_file)
                 img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
                 detections = detector.detect_emotions(img)
@@ -193,18 +193,17 @@ def main_app():
                         st.warning("No faces were detected in the uploaded image.")
                 with col2:
                     st.image(detected_img, channels="BGR", use_column_width=True)
-    
-    with tabs[1]:
-        st.subheader("🗺️ Random Location Sample (Demo)")
-        st.map(pd.DataFrame({
-            'lat': [3.139 + random.uniform(-0.01, 0.01)],
-            'lon': [101.6869 + random.uniform(-0.01, 0.01)]
-        }))
-        st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
+        
+        with tabs[1]:
+            st.subheader("🗺️ Random Location Sample (Demo)")
+            st.map(pd.DataFrame({
+                'lat': [3.139 + random.uniform(-0.01, 0.01)],
+                'lon': [101.6869 + random.uniform(-0.01, 0.01)]
+            }))
+            st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
 
-    with tabs[2]:
-        st.subheader("📊 Emotion Analysis Chart")
-        try:
+        with tabs[2]:
+            st.subheader("📊 Emotion Analysis Chart")
             if os.path.exists("history.csv"):
                 df = pd.read_csv("history.csv")
                 user_history = df[df["username"] == username]  # 只显示该用户的历史记录
@@ -217,8 +216,9 @@ def main_app():
                     st.caption("Chart shows distribution of all detected emotions")
             else:
                 st.info("No history file found.")
-        except Exception as e:
-            st.error(f"Error generating chart: {e}")
+    
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
 
 # ----------------- Run App -----------------
 if __name__ == "__main__":
