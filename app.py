@@ -129,6 +129,10 @@ def show_user_history(username):
         if os.path.exists("history.csv"):
             df = pd.read_csv("history.csv")
             if not df.empty:
+                # Check if username column exists, if not create empty dataframe
+                if 'username' not in df.columns:
+                    df['username'] = ""
+                
                 # Filter for current user only
                 user_df = df[df["username"] == username]
                 
@@ -217,7 +221,7 @@ def main_app():
     username = st.session_state.get("username", "")
     sidebar_design(username)
     
-    st.title("👁‍🗨 AI Emotion & Location Detector")
+    st.title("👁‍🗨 Perspēct")
     st.caption("Upload a photo to detect facial emotions and estimate location.")
     
     # Show history if toggled, otherwise show regular tabs
