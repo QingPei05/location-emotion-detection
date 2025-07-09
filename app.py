@@ -102,15 +102,19 @@ def sidebar_design(username):
     """Design the sidebar with user info and navigation"""
     if username:  # Only show if username exists
         st.sidebar.success(f"👤 Logged in as: {username}")
-        
-        # Add history button to toggle history view
-        if st.sidebar.button("📜 History"):
-            st.session_state.show_history = not st.session_state.get('show_history', False)
     
+    # Make all sidebar sections consistent in length
     st.sidebar.markdown("---")
     st.sidebar.markdown("## Quick Navigation")
     st.sidebar.markdown("- Upload and detect emotions")
     st.sidebar.markdown("- View location map")
+    st.sidebar.divider()
+    
+    # History button moved here
+    if username:
+        if st.sidebar.button("📜 History", key="history_button"):
+            st.session_state.show_history = not st.session_state.get('show_history', False)
+    
     st.sidebar.divider()
     st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
     
@@ -123,7 +127,14 @@ def sidebar_design(username):
 
 def show_user_history(username):
     """Show user-specific history in main content area"""
-    st.subheader("📜 Your History")
+    # Add back button in top right
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.subheader("📜 Your History")
+    with col2:
+        if st.button("⬅ Back to Main"):
+            st.session_state.show_history = False
+            st.rerun()
     
     try:
         if os.path.exists("history.csv"):
@@ -147,20 +158,16 @@ def show_user_history(username):
                     # Add index starting from 1
                     grouped.index = grouped.index + 1
                     
-                    # Display table on left, chart on right
-                    hist_col1, hist_col2 = st.columns([1, 1])
+                    # Display table on top, chart on bottom
+                    st.markdown("**Records**")
+                    st.dataframe(
+                        grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
+                        use_container_width=True
+                    )
                     
-                    with hist_col1:
-                        st.markdown("**Records**")
-                        st.dataframe(
-                            grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
-                            use_container_width=True
-                        )
-                    
-                    with hist_col2:
-                        st.markdown("**Emotion Distribution**")
-                        fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
-                        st.plotly_chart(fig, use_container_width=True)
+                    st.markdown("**Emotion Distribution**")
+                    fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
+                    st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No history records found for your account.")
             else:
