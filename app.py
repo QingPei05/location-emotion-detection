@@ -109,14 +109,13 @@ def sidebar_design(username):
     st.sidebar.markdown("- Upload and detect emotions")
     st.sidebar.markdown("- View location map")
     st.sidebar.divider()
-    
-    # History button moved here
+
+    st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
+    st.sidebar.divider()
+     # History button moved here
     if username:
         if st.sidebar.button("📜 History", key="history_button"):
             st.session_state.show_history = not st.session_state.get('show_history', False)
-    
-    st.sidebar.divider()
-    st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
     
     # Add logout button
     if st.sidebar.button("🚪 Logout"):
