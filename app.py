@@ -53,7 +53,7 @@ def register_user(username, password):
 
 # ----------------- App Configuration -----------------
 st.set_page_config(
-    page_title="AI Emotion & Location Detector",
+    page_title="Perspēct",
     page_icon="👁‍🗨",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -168,8 +168,8 @@ def show_user_history(username):
 
 # ----------------- Login/Signup Pages -----------------
 def login_page():
-    st.title("👁‍🗨 AI Emotion & Location Detector")
-    st.subheader("👤 Sign In")
+    st.title("👁‍🗨 Perspēct")
+    st.subheader("🕵️‍♂️ Sign In")
     username = st.text_input("Username", label_visibility="collapsed", placeholder="Username")
     password = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="Password")
     
@@ -189,8 +189,8 @@ def login_page():
             st.rerun()
 
 def signup_page():
-    st.title("👁‍🗨 AI Emotion & Location Detector")
-    st.subheader("👤 Sign Up")
+    st.title("👁‍🗨 Perspēct")
+    st.subheader("🕵️‍♂️ Sign Up")
     username = st.text_input("Choose a username", label_visibility="collapsed", placeholder="Username")
     password = st.text_input("Choose a password", type="password", label_visibility="collapsed", placeholder="Password")
     confirm_password = st.text_input("Confirm password", type="password", label_visibility="collapsed", placeholder="Confirm Password")
