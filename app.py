@@ -69,9 +69,9 @@ def save_history(username, emotions, confidences, location="Unknown"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     records = []
     for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-        records.append([location, emo, conf, now])
+        records.append([username, location, emo, conf, now])
     
-    df = pd.DataFrame(records, columns=["Location", "Emotion", "Confidence", "timestamp"])
+    df = pd.DataFrame(records, columns=["username", "Location", "Emotion", "Confidence", "timestamp"])
     try:
         if os.path.exists("history.csv"):
             prev = pd.read_csv("history.csv")
@@ -102,11 +102,15 @@ def sidebar_design(username):
     """Design the sidebar with user info and navigation"""
     if username:  # Only show if username exists
         st.sidebar.success(f"👤 Logged in as: {username}")
+        
+        # Add history button to toggle history view
+        if st.sidebar.button("📜 History"):
+            st.session_state.show_history = not st.session_state.get('show_history', False)
+    
     st.sidebar.markdown("---")
     st.sidebar.markdown("## Quick Navigation")
     st.sidebar.markdown("- Upload and detect emotions")
-    st.sidebar.markdown("- View and filter upload history")
-    st.sidebar.markdown("- Visualize your emotion distribution")
+    st.sidebar.markdown("- View location map")
     st.sidebar.divider()
     st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
     
@@ -114,7 +118,53 @@ def sidebar_design(username):
     if st.sidebar.button("🚪 Logout"):
         st.session_state.logged_in = False
         st.session_state.username = ""
+        st.session_state.show_history = False
         st.rerun()
+
+def show_user_history(username):
+    """Show user-specific history in main content area"""
+    st.subheader("📜 Your History")
+    
+    try:
+        if os.path.exists("history.csv"):
+            df = pd.read_csv("history.csv")
+            if not df.empty:
+                # Filter for current user only
+                user_df = df[df["username"] == username]
+                
+                if not user_df.empty:
+                    # Group by timestamp and aggregate emotions
+                    grouped = user_df.groupby('timestamp').agg({
+                        'Location': 'first',
+                        'Emotion': lambda x: ', '.join([f"{x.tolist().count(e)} {e}" for e in set(x)]),
+                        'timestamp': 'first'
+                    }).reset_index(drop=True)
+                    
+                    # Add index starting from 1
+                    grouped.index = grouped.index + 1
+                    
+                    # Display table on left, chart on right
+                    hist_col1, hist_col2 = st.columns([1, 1])
+                    
+                    with hist_col1:
+                        st.markdown("**Records**")
+                        st.dataframe(
+                            grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
+                            use_container_width=True
+                        )
+                    
+                    with hist_col2:
+                        st.markdown("**Emotion Distribution**")
+                        fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
+                        st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No history records found for your account.")
+            else:
+                st.info("No history records found.")
+        else:
+            st.info("No history file found.")
+    except Exception as e:
+        st.error(f"Error loading history: {e}")
 
 # ----------------- Login/Signup Pages -----------------
 def login_page():
@@ -170,104 +220,63 @@ def main_app():
     st.title("👁‍🗨 AI Emotion & Location Detector")
     st.caption("Upload a photo to detect facial emotions and estimate location.")
     
-    tabs = st.tabs(["🏠 Home", "🗺️ Location Map", "📜 Upload History", "📊 Emotion Analysis Chart"])
+    # Show history if toggled, otherwise show regular tabs
+    if st.session_state.get('show_history', False):
+        show_user_history(username)
+    else:
+        tabs = st.tabs(["🏠 Home", "🗺️ Location Map"])
 
-    with tabs[0]:
-        uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-        if uploaded_file:
-            try:
-                image = Image.open(uploaded_file)
-                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-                detections = detector.detect_emotions(img)
-                detected_img = detector.draw_detections(img, detections)
+        with tabs[0]:
+            uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
+            if uploaded_file:
+                try:
+                    image = Image.open(uploaded_file)
+                    img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                    detections = detector.detect_emotions(img)
+                    detected_img = detector.draw_detections(img, detections)
 
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    st.subheader("🔍 Detection Results")
-                    if detections:
-                        emotions = [d["emotion"] for d in detections]
-                        confidences = [d["confidence"] for d in detections]
-                        
-                        # Correct pluralization
-                        face_word = "face" if len(detections) == 1 else "faces"
-                        st.success(f"🎭 {len(detections)} {face_word} detected")
-                        
-                        for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-                            st.write(f"- Face {i + 1}: {emo} ({conf}%)")
-                        
-                        # Add emotion totals
-                        emotion_counts = {}
-                        for emo in emotions:
-                            emotion_counts[emo] = emotion_counts.get(emo, 0) + 1
-                        total_text = "Total: " + ", ".join([f"{count} {emo}" for emo, count in emotion_counts.items()])
-                        st.write(total_text)
-                        
-                        show_detection_guide()
-                        save_history(username, emotions, confidences, "Unknown")
-                    else:
-                        st.warning("No faces were detected in the uploaded image.")
-                with col2:
-                    t1, t2 = st.tabs(["Original Image", "Processed Image"])
-                    with t1:
-                        st.image(image, use_column_width=True)
-                    with t2:
-                        st.image(detected_img, channels="BGR", use_column_width=True,
-                                caption=f"Detected {len(detections)} {face_word}")
-            except Exception as e:
-                st.error(f"Error while processing the image: {e}")
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        st.subheader("🔍 Detection Results")
+                        if detections:
+                            emotions = [d["emotion"] for d in detections]
+                            confidences = [d["confidence"] for d in detections]
+                            
+                            # Correct pluralization
+                            face_word = "face" if len(detections) == 1 else "faces"
+                            st.success(f"🎭 {len(detections)} {face_word} detected")
+                            
+                            for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                                st.write(f"- Face {i + 1}: {emo} ({conf}%)")
+                            
+                            # Add emotion totals
+                            emotion_counts = {}
+                            for emo in emotions:
+                                emotion_counts[emo] = emotion_counts.get(emo, 0) + 1
+                            total_text = "Total: " + ", ".join([f"{count} {emo}" for emo, count in emotion_counts.items()])
+                            st.write(total_text)
+                            
+                            show_detection_guide()
+                            save_history(username, emotions, confidences, "Unknown")
+                        else:
+                            st.warning("No faces were detected in the uploaded image.")
+                    with col2:
+                        t1, t2 = st.tabs(["Original Image", "Processed Image"])
+                        with t1:
+                            st.image(image, use_column_width=True)
+                        with t2:
+                            st.image(detected_img, channels="BGR", use_column_width=True,
+                                    caption=f"Detected {len(detections)} {face_word}")
+                except Exception as e:
+                    st.error(f"Error while processing the image: {e}")
 
-    with tabs[1]:
-        st.subheader("🗺️ Random Location Sample (Demo)")
-        st.map(pd.DataFrame({
-            'lat': [3.139 + random.uniform(-0.01, 0.01)],
-            'lon': [101.6869 + random.uniform(-0.01, 0.01)]
-        }))
-        st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
-
-    with tabs[2]:
-        st.subheader("📜 Upload History")
-        try:
-            if os.path.exists("history.csv"):
-                df = pd.read_csv("history.csv")
-                if df.empty:
-                    st.info("No upload records found.")
-                else:
-                    # Display the history without username
-                    edited_df = st.data_editor(
-                        df[["Location", "Emotion", "Confidence", "timestamp"]],
-                        key="history_editor"
-                    )
-                    
-                    # Show details when row is selected
-                    if "history_editor" in st.session_state:
-                        selected_rows = st.session_state.history_editor["edited_rows"]
-                        for idx, changes in selected_rows.items():
-                            if changes:
-                                with st.expander(f"Details for record {idx+1}"):
-                                    st.write(f"Location: {df.iloc[idx]['Location']}")
-                                    st.write(f"Emotion: {df.iloc[idx]['Emotion']}")
-                                    st.write(f"Confidence: {df.iloc[idx]['Confidence']}%")
-                                    st.write(f"Timestamp: {df.iloc[idx]['timestamp']}")
-            else:
-                st.info("No history file found.")
-        except Exception as e:
-            st.warning(f"Error loading history records: {e}")
-
-    with tabs[3]:
-        st.subheader("📊 Emotion Analysis Chart")
-        try:
-            if os.path.exists("history.csv"):
-                df = pd.read_csv("history.csv")
-                if df.empty:
-                    st.info("No emotion records found.")
-                else:
-                    fig = px.pie(df, names="Emotion", title="Emotion Distribution")
-                    st.plotly_chart(fig)
-                    st.caption("Chart shows distribution of all detected emotions")
-            else:
-                st.info("No history file found.")
-        except Exception as e:
-            st.error(f"Error generating chart: {e}")
+        with tabs[1]:
+            st.subheader("🗺️ Random Location Sample (Demo)")
+            st.map(pd.DataFrame({
+                'lat': [3.139 + random.uniform(-0.01, 0.01)],
+                'lon': [101.6869 + random.uniform(-0.01, 0.01)]
+            }))
+            st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
 
 # ----------------- Run App -----------------
 if __name__ == "__main__":
@@ -278,6 +287,8 @@ if __name__ == "__main__":
         st.session_state.show_signup = False
     if "username" not in st.session_state:
         st.session_state.username = ""
+    if "show_history" not in st.session_state:
+        st.session_state.show_history = False
 
     # Authentication flow
     if not st.session_state.logged_in:
