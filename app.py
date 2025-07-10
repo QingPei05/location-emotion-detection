@@ -170,7 +170,7 @@ def show_user_history(username):
                     st.markdown("<br><br>", unsafe_allow_html=True)
                     st.markdown("**📊 Emotion Distribution**")
                     # Create columns for the selection and chart
-                    col_select, col_chart = st.columns([3, 7])
+                    col_select, col_chart = st.columns([2, 5])
                     
                     with col_select:
                         # Add record selection for chart
