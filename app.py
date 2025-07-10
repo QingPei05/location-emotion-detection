@@ -163,8 +163,12 @@ def show_user_history(username):
                     # Display table with checkboxes in last column
                     st.markdown("**📝 Records**")
                     
-                    # Add select column
-                    grouped_display['Select'] = False
+                    # Initialize selection state if not exists
+                    if 'select_all_state' not in st.session_state:
+                        st.session_state.select_all_state = False
+                    
+                    # Add select column with current selection state
+                    grouped_display['Select'] = st.session_state.select_all_state
                     
                     # Display non-editable table with checkboxes
                     edited_df = st.data_editor(
@@ -177,9 +181,10 @@ def show_user_history(username):
                     # Add select all and delete buttons on the right
                     col1, col2 = st.columns([4, 1])
                     with col2:
-                        select_all = st.checkbox("Select All", key="select_all")
-                        if select_all:
-                            edited_df['Select'] = True
+                        select_all = st.checkbox("Select All", key="select_all", value=st.session_state.select_all_state)
+                        if select_all != st.session_state.select_all_state:
+                            st.session_state.select_all_state = select_all
+                            st.rerun()
                         
                         if st.button("🗑️ Delete", key="delete_button"):
                             # Get indices of selected rows
@@ -193,6 +198,7 @@ def show_user_history(username):
                                     # Save back to CSV
                                     df.to_csv("history.csv", index=False)
                                     st.success("Selected records deleted successfully!")
+                                    st.session_state.select_all_state = False
                                     st.rerun()
                                 except KeyError:
                                     st.error("Error: Could not find selected records to delete")
