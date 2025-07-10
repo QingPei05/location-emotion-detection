@@ -163,39 +163,27 @@ def show_user_history(username):
                     # Display table with checkboxes in last column
                     st.markdown("**📝 Records**")
                     
-                    # Initialize selection state if not exists
-                    if 'selected_rows' not in st.session_state:
-                        st.session_state.selected_rows = [False] * len(grouped_display)
-                    
-                    # Add select column with current selection state
-                    grouped_display['Select'] = st.session_state.selected_rows
+                    # Add select column
+                    grouped_display['Select'] = False
                     
                     # Display non-editable table with checkboxes
                     edited_df = st.data_editor(
                         grouped_display[["Location", "Emotion", "Time", "Select"]],
                         disabled=["Location", "Emotion", "Time"],
                         hide_index=True,
-                        use_container_width=True,
-                        key="history_table"
+                        use_container_width=True
                     )
-                    
-                    # Update selection state
-                    st.session_state.selected_rows = edited_df['Select'].tolist()
                     
                     # Add select all and delete buttons on the right
                     col1, col2 = st.columns([4, 1])
                     with col2:
-                        if st.button("Select All", key="select_all"):
-                            st.session_state.selected_rows = [True] * len(grouped_display)
-                            st.rerun()
-                        
-                        if st.button("Clear All", key="clear_all"):
-                            st.session_state.selected_rows = [False] * len(grouped_display)
-                            st.rerun()
+                        select_all = st.checkbox("Select All", key="select_all")
+                        if select_all:
+                            edited_df['Select'] = True
                         
                         if st.button("🗑️ Delete", key="delete_button"):
                             # Get indices of selected rows
-                            selected_indices = [i for i, selected in enumerate(st.session_state.selected_rows) if selected]
+                            selected_indices = edited_df.index[edited_df['Select']].tolist()
                             if selected_indices:
                                 # Safely get the timestamps to delete
                                 try:
@@ -205,8 +193,6 @@ def show_user_history(username):
                                     # Save back to CSV
                                     df.to_csv("history.csv", index=False)
                                     st.success("Selected records deleted successfully!")
-                                    # Reset selection state
-                                    st.session_state.selected_rows = [False] * len(grouped_display)
                                     st.rerun()
                                 except KeyError:
                                     st.error("Error: Could not find selected records to delete")
