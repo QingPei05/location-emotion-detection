@@ -171,7 +171,7 @@ def show_user_history(username):
                         grouped_display[["Location", "Emotion", "Time", "Select"]],
                         disabled=["Location", "Emotion", "Time"],
                         hide_index=True,
-                        use_container_width=True
+                        use_container_width=True,
                         key="history_table"
                     )
                     
