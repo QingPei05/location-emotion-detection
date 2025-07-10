@@ -161,13 +161,13 @@ def show_user_history(username):
                     grouped_display = grouped.rename(columns={"timestamp": "Time"})
                     
                     # Display table on top, chart on bottom
-                    st.markdown("**📝Records**")
+                    st.markdown("**📝 Records**")
                     st.table(
                         grouped_display[["Location", "Emotion", "Time"]]
                     )
         
                     st.markdown("<br><br>", unsafe_allow_html=True)
-                    st.markdown("**📊Emotion Distribution**")
+                    st.markdown("**📊 Emotion Distribution**")
                     
                     # Add record selection for chart
                     records = grouped["timestamp"].tolist()
