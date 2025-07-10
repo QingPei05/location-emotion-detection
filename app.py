@@ -161,11 +161,27 @@ def show_user_history(username):
                     st.markdown("**📝Records**")
                     st.dataframe(
                         grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
-                        use_container_width=True
+                        use_container_width=True,
+                        disabled=True  # Make table read-only
                     )
         
+                    # Add spacing between table and chart
+                    st.markdown("<br><br>", unsafe_allow_html=True)
+                    
+                    # Add record selection for chart
+                    records = grouped["Time"].tolist()
+                    records.insert(0, "All")  # Add "All" option
+                    selected_record = st.selectbox("Select record to view:", records, index=0)
+
+                    # Filter data based on selection
+                    if selected_record == "All":
+                        chart_data = user_df
+                    else:
+                        chart_data = user_df[user_df["timestamp"] == selected_record]
+
+                    # Display chart with simplified title
                     st.markdown("**📊Emotion Distribution**")
-                    fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
+                    fig = px.pie(chart_data, names="Emotion", title="📊 Emotion Distribution")
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No history records found for your account.")
@@ -209,7 +225,9 @@ def signup_page():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Register"):
-            if password != confirm_password:
+            if not username or not password or not confirm_password:
+                st.error("All fields are required!")
+            elif password != confirm_password:
                 st.error("Passwords don't match")
             elif register_user(username, password):
                 st.success("Registration successful! Please sign in.")
@@ -273,9 +291,9 @@ def main_app():
                     with col2:
                         t1, t2 = st.tabs(["Original Image", "Processed Image"])
                         with t1:
-                            st.image(image, use_container_width=True)
+                            st.image(image, use_column_width=True)
                         with t2:
-                            st.image(detected_img, channels="BGR", use_container_width=True,
+                            st.image(detected_img, channels="BGR", use_column_width=True,
                                     caption=f"Detected {len(detections)} {face_word}")
                 except Exception as e:
                     st.error(f"Error while processing the image: {e}")
