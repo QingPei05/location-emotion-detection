@@ -1,4 +1,3 @@
-# Core dependencies
 streamlit>=1.30.0
 pillow==10.1.0
 opencv-python-headless==4.9.0.80
@@ -17,6 +16,6 @@ protobuf==3.20.3
 geopy==2.4.1
 python-dotenv==1.0.0
 
-# CLIP model support (Hugging Face Transformers)
+# CLIP model support
 transformers==4.39.3
 torch>=2.1.0
