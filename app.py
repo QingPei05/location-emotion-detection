@@ -181,16 +181,6 @@ def show_user_history(username):
                         if select_all:
                             edited_df['Select'] = True
                         
-                        # Delete button with red background
-                        st.markdown("""
-                            <style>
-                                div.stButton > button:first-child {
-                                    background-color: #ff4b4b;
-                                    color: white;
-                                }
-                            </style>
-                        """, unsafe_allow_html=True)
-                        
                         if st.button("🗑️ Delete", key="delete_button"):
                             # Get indices of selected rows
                             selected_indices = edited_df.index[edited_df['Select']].tolist()
