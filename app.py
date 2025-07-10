@@ -157,14 +157,16 @@ def show_user_history(username):
                     # Add index starting from 1
                     grouped.index = grouped.index + 1
                     
-                    # Add select column to grouped display
+                    # Rename timestamp to Time for display
                     grouped_display = grouped.rename(columns={"timestamp": "Time"})
-                    grouped_display['Select'] = False
                     
                     # Display table with checkboxes in last column
                     st.markdown("**📝 Records**")
                     
-                    # Convert dataframe to editable format with checkboxes
+                    # Add select column
+                    grouped_display['Select'] = False
+                    
+                    # Display editable dataframe with checkboxes
                     edited_df = st.data_editor(
                         grouped_display[["Location", "Emotion", "Time", "Select"]],
                         disabled=["Location", "Emotion", "Time"],
@@ -175,7 +177,8 @@ def show_user_history(username):
                     # Add select all and delete buttons on the right
                     col1, col2 = st.columns([4, 1])
                     with col2:
-                        if st.checkbox("Select All", key="select_all"):
+                        select_all = st.checkbox("Select All", key="select_all")
+                        if select_all:
                             edited_df['Select'] = True
                         
                         if st.button("🗑️ Delete", key="delete_button"):
@@ -222,8 +225,6 @@ def show_user_history(username):
                 st.info("No history records found.")
         else:
             st.info("No history file found.")
-    except Exception as e:
-        st.error(f"Error loading history: {e}")nd.")
     except Exception as e:
         st.error(f"Error loading history: {e}")
 
