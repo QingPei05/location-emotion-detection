@@ -187,7 +187,7 @@ def show_user_history(username):
                             # Get the timestamps to delete
                             timestamps_to_delete = grouped.iloc[delete_indices]["timestamp"].tolist()
                             # Filter out the deleted records
-                            df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete))]
+                            df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
                             # Save back to CSV
                             df.to_csv("history.csv", index=False)
                             st.success("Selected records deleted successfully!")
