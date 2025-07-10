@@ -9,12 +9,6 @@ import os
 import plotly.express as px
 from emotion_utils.detector import EmotionDetector
 import hashlib
-import tempfile
-from location_utils.extract_gps import extract_gps, convert_gps
-from location_utils.geocoder import get_address_from_coords
-from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
-import sys
-import subprocess
 
 # ----------------- User Authentication -----------------
 def authenticate(username, password):
@@ -71,13 +65,13 @@ def get_detector():
 
 detector = get_detector()
 
-def save_history(username, emotions, confidences, location="Unknown", method=""):
+def save_history(username, emotions, confidences, location="Unknown"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     records = []
     for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-        records.append([username, location, method, emo, conf, now])
+        records.append([username, location, emo, conf, now])
     
-    df = pd.DataFrame(records, columns=["username", "Location", "Method", "Emotion", "Confidence", "timestamp"])
+    df = pd.DataFrame(records, columns=["username", "Location", "Emotion", "Confidence", "timestamp"])
     try:
         if os.path.exists("history.csv"):
             prev = pd.read_csv("history.csv")
@@ -118,8 +112,7 @@ def sidebar_design(username):
 
     st.sidebar.info("Enhance your experience by ensuring clear, well-lit facial images.")
     st.sidebar.divider()
-    
-    # History button moved here
+     # History button moved here
     if username:
         if st.sidebar.button("📜 History", key="history_button"):
             st.session_state.show_history = not st.session_state.get('show_history', False)
@@ -157,7 +150,6 @@ def show_user_history(username):
                     # Group by timestamp and aggregate emotions
                     grouped = user_df.groupby('timestamp').agg({
                         'Location': 'first',
-                        'Method': 'first',
                         'Emotion': lambda x: ', '.join([f"{x.tolist().count(e)} {e}" for e in set(x)]),
                         'timestamp': 'first'
                     }).reset_index(drop=True)
@@ -180,8 +172,8 @@ def show_user_history(username):
                     
                     # Display non-editable table with checkboxes
                     edited_df = st.data_editor(
-                        grouped_display[["Location", "Method", "Emotion", "Time", "Select"]],
-                        disabled=["Location", "Method", "Emotion", "Time"],
+                        grouped_display[["Location", "Emotion", "Time", "Select"]],
+                        disabled=["Location", "Emotion", "Time"],
                         hide_index=True,
                         use_container_width=True
                     )
@@ -320,67 +312,11 @@ def main_app():
         with tabs[0]:
             uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
             if uploaded_file:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                    tmp_file.write(uploaded_file.read())
-                    temp_path = tmp_file.name
-               
                 try:
-                    # Debug info
-                    print(f"[MAIN] Processing image: {uploaded_file.name}")
-                    print(f"[MAIN] Image size: {uploaded_file.size} bytes")
-                    
-                    image = Image.open(temp_path).convert("RGB")
+                    image = Image.open(uploaded_file)
                     img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
                     detections = detector.detect_emotions(img)
                     detected_img = detector.draw_detections(img, detections)
-                        
-                    location = "Unknown"
-                    method = ""
-                    gps_info = extract_gps(temp_path)
-                
-                    if gps_info:
-                        print(f"[MAIN] GPS extraction successful: {list(gps_info.keys())}")
-                        coords = convert_gps(gps_info)
-   
-                        if coords:
-                            print(f"[MAIN] GPS coordinates: {coords}")
-                            location = get_address_from_coords(coords)
-                            method = "GPS Metadata"
-                        else:
-                            print("[MAIN] No GPS data found in image")
-                                
-                    if location in ("Unknown", "Unknown location"):
-                        print("[MAIN] Trying landmark detection...")
-                        landmark = detect_landmark(temp_path, threshold=0.15, top_k=5)
-                        
-                        if landmark:
-                            print(f"[MAIN] CLIP predicted landmark: {landmark}")
-                            st.write(f"🔍 CLIP predicted landmark: **{landmark}**")
-                            
-                            coords_result, source = query_landmark_coords(landmark)
-                            
-                            if coords_result:
-                                lat, lon = coords_result
-                                print(f"[MAIN] Landmark coordinates: {lat}, {lon} (source: {source})")
-                                addr = get_address_from_coords((lat, lon))
-                                if addr and addr not in ("Unknown location", "Invalid coordinates", "Geocoding service unavailable"):
-                                    location = addr
-                                    method = f"Landmark ({source})"
-                                    print(f"[MAIN] Final location: {location}")
-                                else:
-                                    if landmark in LANDMARK_KEYWORDS:
-                                        landmark_info = LANDMARK_KEYWORDS[landmark]
-                                        location = f"{landmark_info[0]}, {landmark_info[1]}"
-                                    else:
-                                        location = f"{landmark.title()} ({lat:.4f}, {lon:.4f})"
-                                        method = f"Landmark ({source})"
-                                        print(f"[MAIN] Using landmark fallback: {location}")
-                            else:
-                                print(f"[MAIN] No coordinates found for landmark: {landmark}")
-                                st.write(f"⚠️ Landmark detected but no coordinates available")
-                        else:
-                            print("[MAIN] No landmark detected with sufficient confidence")
-                            st.write("🔍 No landmark detected with sufficient confidence")
 
                     col1, col2 = st.columns([1, 2])
                     with col1:
@@ -404,59 +340,26 @@ def main_app():
                             st.write(total_text)
                             
                             show_detection_guide()
-                            st.write(f"📍 Estimated Location: **{location}** ({method})")
-                            save_history(username, emotions, confidences, location, method)
+                            save_history(username, emotions, confidences, "Unknown")
                         else:
                             st.warning("No faces were detected in the uploaded image.")
                     with col2:
                         t1, t2 = st.tabs(["Original Image", "Processed Image"])
                         with t1:
-                            st.image(image, use_column_width=True)
+                            st.image(image, use_container_width=True)
                         with t2:
-                            st.image(detected_img, channels="BGR", use_column_width=True,
+                            st.image(detected_img, channels="BGR", use_container_width=True,
                                     caption=f"Detected {len(detections)} {face_word}")
                 except Exception as e:
                     st.error(f"Error while processing the image: {e}")
-                finally:
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
 
         with tabs[1]:
-            st.subheader("🗺️ Location Map")
-            try:
-                if os.path.exists("history.csv"):
-                    df = pd.read_csv("history.csv")
-                    if not df.empty and username:
-                        user_df = df[df["username"] == username]
-                        if not user_df.empty:
-                            # Extract coordinates from location data
-                            locations = []
-                            for loc in user_df["Location"].unique():
-                                if loc not in ["Unknown", "Unknown location"]:
-                                    # Try to extract coordinates from landmark format
-                                    if "(" in loc and ")" in loc:
-                                        coord_part = loc.split("(")[-1].split(")")[0]
-                                        try:
-                                            lat, lon = map(float, coord_part.split(","))
-                                            locations.append({"lat": lat, "lon": lon, "Location": loc})
-                                        except:
-                                            pass
-                            
-                            if locations:
-                                map_df = pd.DataFrame(locations)
-                                st.map(map_df)
-                            else:
-                                st.info("No mappable locations found in your history")
-                        else:
-                            st.info("No location data found for your account")
-                    else:
-                        st.info("No history records found")
-                else:
-                    st.info("No history file found")
-            except Exception as e:
-                st.error(f"Error loading location data: {e}")
+            st.subheader("🗺️ Random Location Sample (Demo)")
+            st.map(pd.DataFrame({
+                'lat': [3.139 + random.uniform(-0.01, 0.01)],
+                'lon': [101.6869 + random.uniform(-0.01, 0.01)]
+            }))
+            st.caption("Note: This location map is a demo preview and not actual detected GPS data.")
 
 # ----------------- Run App -----------------
 if __name__ == "__main__":
