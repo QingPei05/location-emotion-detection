@@ -172,6 +172,7 @@ def show_user_history(username):
                         disabled=["Location", "Emotion", "Time"],
                         hide_index=True,
                         use_container_width=True
+                        key="history_table"
                     )
                     
                     # Add select all and delete buttons on the right
@@ -180,6 +181,8 @@ def show_user_history(username):
                         select_all = st.checkbox("Select All", key="select_all")
                         if select_all:
                             edited_df['Select'] = True
+                            st.session_state.history_table = edited_df
+                            st.rerun()
                         
                         if st.button("🗑️ Delete", key="delete_button"):
                             # Get indices of selected rows
