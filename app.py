@@ -158,13 +158,14 @@ def show_user_history(username):
                     grouped.index = grouped.index + 1
                     
                     # Display table on top, chart on bottom
-                    st.markdown("**Records**")
+                    st.markdown("**📝Records**")
                     st.dataframe(
                         grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
                         use_container_width=True
                     )
                     
-                    st.markdown("**Emotion Distribution**")
+                    st.markdown()
+                    st.markdown("**📊Emotion Distribution**")
                     fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
                     st.plotly_chart(fig, use_container_width=True)
                 else:
