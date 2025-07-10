@@ -166,8 +166,8 @@ def show_user_history(username):
                         grouped_display[["Location", "Emotion", "Time"]]
                     )
         
-                    # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
+                    st.markdown("**📊Emotion Distribution**")
                     
                     # Add record selection for chart
                     records = grouped["timestamp"].tolist()
@@ -183,8 +183,8 @@ def show_user_history(username):
                         chart_data = user_df[user_df["timestamp"] == selected_record]
 
                     # Display chart with simplified title
-                    st.markdown("**📊Emotion Distribution**")
-                    fig = px.pie(chart_data, names="Emotion", title="📊 Emotion Distribution")
+                    
+                    fig = px.pie(chart_data, names="Emotion")
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No history records found for your account.")
