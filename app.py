@@ -127,11 +127,11 @@ def sidebar_design(username):
 def show_user_history(username):
     """Show user-specific history in main content area"""
     # Add back button in top right
-    col1, col2 = st.columns([2, 5])
+    col1, col2 = st.columns([4, 1])
     with col1:
         st.subheader("📜 Your History")
     with col2:
-        if st.button("⬅ Back to Main"):
+        if st.button("⬅ Back to Main", key="back_button"):
             st.session_state.show_history = False
             st.rerun()
     
@@ -157,41 +157,39 @@ def show_user_history(username):
                     # Add index starting from 1
                     grouped.index = grouped.index + 1
                     
-                    # Rename timestamp to Time for display
+                    # Add select column to grouped display
                     grouped_display = grouped.rename(columns={"timestamp": "Time"})
+                    grouped_display['Select'] = False
                     
-                    # Add checkboxes for deletion
+                    # Display table with checkboxes in last column
                     st.markdown("**📝 Records**")
                     
-                    # Add select all checkbox
-                    col_del1, col_del2 = st.columns([1, 5])
-                    with col_del1:
-                        select_all = st.checkbox("Select All")
+                    # Convert dataframe to editable format with checkboxes
+                    edited_df = st.data_editor(
+                        grouped_display[["Location", "Emotion", "Time", "Select"]],
+                        disabled=["Location", "Emotion", "Time"],
+                        hide_index=True,
+                        use_container_width=True
+                    )
                     
-                    # Create a list to store which records to delete
-                    delete_indices = []
-                    
-                    # Display each record with checkbox
-                    for idx, row in grouped_display.iterrows():
-                        col1, col2 = st.columns([1, 5])
-                        with col1:
-                            delete = st.checkbox("", key=f"delete_{idx}", value=select_all)
-                            if delete:
-                                delete_indices.append(idx-1)  # Because we added +1 earlier
-                        with col2:
-                            st.table(row[["Location", "Emotion", "Time"]].to_frame().T)
-                    
-                    # Add delete button
-                    if st.button("Delete Selected"):
-                        if delete_indices:
-                            # Get the timestamps to delete
-                            timestamps_to_delete = grouped.iloc[delete_indices]["timestamp"].tolist()
-                            # Filter out the deleted records
-                            df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
-                            # Save back to CSV
-                            df.to_csv("history.csv", index=False)
-                            st.success("Selected records deleted successfully!")
-                            st.rerun()
+                    # Add select all and delete buttons on the right
+                    col1, col2 = st.columns([4, 1])
+                    with col2:
+                        if st.checkbox("Select All", key="select_all"):
+                            edited_df['Select'] = True
+                        
+                        if st.button("🗑️ Delete", key="delete_button"):
+                            # Get indices of selected rows
+                            selected_indices = edited_df.index[edited_df['Select']].tolist()
+                            if selected_indices:
+                                # Get the timestamps to delete
+                                timestamps_to_delete = grouped.iloc[selected_indices]["timestamp"].tolist()
+                                # Filter out the deleted records
+                                df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
+                                # Save back to CSV
+                                df.to_csv("history.csv", index=False)
+                                st.success("Selected records deleted successfully!")
+                                st.rerun()
         
                     # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -225,6 +223,8 @@ def show_user_history(username):
         else:
             st.info("No history file found.")
     except Exception as e:
+        st.error(f"Error loading history: {e}")nd.")
+    except Exception as e:
         st.error(f"Error loading history: {e}")
 
 # ----------------- Login/Signup Pages -----------------
@@ -236,12 +236,12 @@ def login_page():
         username = st.text_input("Username", label_visibility="collapsed", placeholder="Username")
         password = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="Password")
         
-        # Buttons side by side
-        col1, col2 = st.columns(2)
-        with col1:
+        # Buttons side by side with Sign Up pushed to right
+        cols = st.columns([3, 1])  # 3:1 ratio for left vs right space
+        with cols[0]:
             login_submitted = st.form_submit_button("Sign In")
-        with col2:
-            signup_clicked = st.form_submit_button("Sign Up")
+        with cols[1]:
+            signup_clicked = st.form_submit_button("Sign Up →")
         
         if login_submitted:
             if authenticate(username, password):
@@ -253,7 +253,7 @@ def login_page():
         elif signup_clicked:
             st.session_state["show_signup"] = True
             st.rerun()
-            
+
 def signup_page():
     st.title("👁‍🗨 Perspēct")
     st.subheader("🕵️‍♂️ Sign Up")
@@ -263,12 +263,12 @@ def signup_page():
         password = st.text_input("Choose a password", type="password", label_visibility="collapsed", placeholder="Password")
         confirm_password = st.text_input("Confirm password", type="password", label_visibility="collapsed", placeholder="Confirm Password")
         
-        # Buttons side by side
-        col1, col2 = st.columns(2)
-        with col1:
+        # Buttons side by side with Back pushed to right
+        cols = st.columns([3, 1])  # 3:1 ratio for left vs right space
+        with cols[0]:
             register_submitted = st.form_submit_button("Register")
-        with col2:
-            back_clicked = st.form_submit_button("Back to Sign In")
+        with cols[1]:
+            back_clicked = st.form_submit_button("← Back")
         
         if register_submitted:
             if not username or not password or not confirm_password:
