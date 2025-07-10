@@ -159,10 +159,9 @@ def show_user_history(username):
                     
                     # Display table on top, chart on bottom
                     st.markdown("**📝Records**")
-                    st.dataframe(
-                        grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
-                        use_container_width=True,
-                        disabled=True  # Make table read-only
+                    # Changed from st.dataframe() to st.table() to make it read-only
+                    st.table(
+                        grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"})
                     )
         
                     # Add spacing between table and chart
@@ -226,7 +225,7 @@ def signup_page():
     with col1:
         if st.button("Register"):
             if not username or not password or not confirm_password:
-                st.error("All fields are required!")
+                st.error("Username and passward are required!")
             elif password != confirm_password:
                 st.error("Passwords don't match")
             elif register_user(username, password):
