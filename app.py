@@ -166,10 +166,10 @@ def show_user_history(username):
                     # Add select column
                     grouped_display['Select'] = False
                     
-                    # Display editable dataframe with checkboxes
+                    # Display non-editable table with checkboxes
                     edited_df = st.data_editor(
                         grouped_display[["Location", "Emotion", "Time", "Select"]],
-                        disabled=["Location", "Emotion", "Time"],
+                        disabled=["Location", "Emotion", "Time", "Select"],
                         hide_index=True,
                         use_container_width=True
                     )
@@ -180,6 +180,16 @@ def show_user_history(username):
                         select_all = st.checkbox("Select All", key="select_all")
                         if select_all:
                             edited_df['Select'] = True
+                        
+                        # Delete button with red background
+                        st.markdown("""
+                            <style>
+                                div.stButton > button:first-child {
+                                    background-color: #ff4b4b;
+                                    color: white;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
                         
                         if st.button("🗑️ Delete", key="delete_button"):
                             # Get indices of selected rows
