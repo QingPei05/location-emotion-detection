@@ -157,20 +157,24 @@ def show_user_history(username):
                     # Add index starting from 1
                     grouped.index = grouped.index + 1
                     
+                    # Rename timestamp to Time for display
+                    grouped_display = grouped.rename(columns={"timestamp": "Time"})
+                    
                     # Display table on top, chart on bottom
                     st.markdown("**📝Records**")
-                    # Changed from st.dataframe() to st.table() to make it read-only
                     st.table(
-                        grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"})
+                        grouped_display[["Location", "Emotion", "Time"]]
                     )
         
                     # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
                     
                     # Add record selection for chart
-                    records = grouped["Time"].tolist()
+                    records = grouped["timestamp"].tolist()
                     records.insert(0, "All")  # Add "All" option
-                    selected_record = st.selectbox("Select record to view:", records, index=0)
+                    selected_record = st.selectbox("Select record to view:", 
+                                                 ["All"] + [str(ts) for ts in grouped["timestamp"].tolist()], 
+                                                 index=0)
 
                     # Filter data based on selection
                     if selected_record == "All":
