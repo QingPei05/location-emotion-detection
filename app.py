@@ -163,8 +163,7 @@ def show_user_history(username):
                         grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
                         use_container_width=True
                     )
-                    
-                    st.markdown()
+        
                     st.markdown("**📊Emotion Distribution**")
                     fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
                     st.plotly_chart(fig, use_container_width=True)
@@ -274,9 +273,9 @@ def main_app():
                     with col2:
                         t1, t2 = st.tabs(["Original Image", "Processed Image"])
                         with t1:
-                            st.image(image, use_column_width=True)
+                            st.image(image, use_container_width=True)
                         with t2:
-                            st.image(detected_img, channels="BGR", use_column_width=True,
+                            st.image(detected_img, channels="BGR", use_container_width=True,
                                     caption=f"Detected {len(detections)} {face_word}")
                 except Exception as e:
                     st.error(f"Error while processing the image: {e}")
