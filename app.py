@@ -240,7 +240,7 @@ def login_page():
         # Buttons side by side with Sign Up pushed to right
         cols = st.columns([3, 1])  # 3:1 ratio for left vs right space
         with cols[0]:
-            login_submitted = st.form_submit_button("Sign In")
+            login_submitted = st.form_submit_button("Log In")
         with cols[1]:
             signup_clicked = st.form_submit_button("Sign Up →")
         
