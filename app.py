@@ -166,7 +166,7 @@ def show_user_history(username):
                     # Add select column
                     grouped_display['Select'] = False
                     
-                    # Display editable dataframe with checkboxes
+                    # Display non-editable table with checkboxes
                     edited_df = st.data_editor(
                         grouped_display[["Location", "Emotion", "Time", "Select"]],
                         disabled=["Location", "Emotion", "Time"],
@@ -181,18 +181,31 @@ def show_user_history(username):
                         if select_all:
                             edited_df['Select'] = True
                         
+                        # Delete button with red background
+                        st.markdown("""
+                            <style>
+                                div.stButton > button:first-child {
+                                    background-color: #ff4b4b;
+                                    color: white;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
+                        
                         if st.button("🗑️ Delete", key="delete_button"):
                             # Get indices of selected rows
                             selected_indices = edited_df.index[edited_df['Select']].tolist()
                             if selected_indices:
-                                # Get the timestamps to delete
-                                timestamps_to_delete = grouped.iloc[selected_indices]["timestamp"].tolist()
-                                # Filter out the deleted records
-                                df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
-                                # Save back to CSV
-                                df.to_csv("history.csv", index=False)
-                                st.success("Selected records deleted successfully!")
-                                st.rerun()
+                                # Safely get the timestamps to delete
+                                try:
+                                    timestamps_to_delete = grouped.loc[selected_indices, "timestamp"].tolist()
+                                    # Filter out the deleted records
+                                    df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete))]
+                                    # Save back to CSV
+                                    df.to_csv("history.csv", index=False)
+                                    st.success("Selected records deleted successfully!")
+                                    st.rerun()
+                                except KeyError:
+                                    st.error("Error: Could not find selected records to delete")
         
                     # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
