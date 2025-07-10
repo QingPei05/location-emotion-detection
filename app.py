@@ -168,7 +168,7 @@ def show_user_history(username):
         
                     # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
-                    
+                    st.markdown("**📊 Emotion Distribution**")
                     # Create columns for the selection and chart
                     col_select, col_chart = st.columns([1, 3])
                     
@@ -188,8 +188,8 @@ def show_user_history(username):
 
                     with col_chart:
                         # Display chart with simplified title
-                        st.markdown("**📊 Emotion Distribution**")
-                        fig = px.pie(chart_data, names="Emotion", title="📊 Emotion Distribution")
+                        
+                        fig = px.pie(chart_data, names="Emotion")
                         st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No history records found for your account.")
