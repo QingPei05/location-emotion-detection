@@ -139,7 +139,7 @@ def show_user_history(username):
         st.markdown("<br>", unsafe_allow_html=True)
         st.subheader("📜 Your History")
     with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("⬅ Back to Main", key="back_button"):
             st.session_state.show_history = False
             st.rerun()
