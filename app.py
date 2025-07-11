@@ -136,8 +136,10 @@ def show_user_history(username):
     # Add back button in top right
     col1, col2 = st.columns([3, 1])
     with col1:
+        st.markdown("<br>", unsafe_allow_html=True)
         st.subheader("📜 Your History")
     with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("⬅ Back to Main", key="back_button"):
             st.session_state.show_history = False
             st.rerun()
