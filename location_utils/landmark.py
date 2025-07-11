@@ -61,6 +61,8 @@ LANDMARK_KEYWORDS = {
     "big ben": ["Big Ben", "London", 51.5007, -0.1246],
     "louvre": ["Louvre Museum", "Paris", 48.8606, 2.3376],
     "sagrada familia": ["Sagrada Família", "Barcelona", 41.4036, 2.1744],
+    "leaning tower of pisa": ["Leaning Tower of Pisa", "Pisa", 43.7230, 10.3966],
+    "piazza dei miracoli":    ["Piazza dei Miracoli",    "Pisa", 43.7230, 10.3966],
 
     # America
     "golden gate bridge": ["Golden Gate Bridge", "San Francisco", 37.8199, -122.4783],
@@ -79,71 +81,76 @@ LANDMARK_KEYWORDS = {
 
 OVERPASS_URL = "http://overpass-api.de/api/interpreter"
 
-def detect_landmark(image_path: str, threshold: float = 0.15, top_k: int = 5) -> Optional[str]:
-    """
-    Use CLIP model to match the image with a predefined list of landmarks.
-    Returns the best matched keyword if confidence > threshold, else None.
-    """
-     image_path: str,
+def detect_landmark(
+    image_path: str,
     threshold: float = 0.15,
     top_k: int = 5
 ) -> Optional[str]:
+    """
+    Use CLIP to match the image against predefined landmarks.
+    Returns the matched keyword (lowercased) if score >= threshold, else None.
+    """
     try:
+        # Load and preprocess image
         image = Image.open(image_path).convert("RGB")
         keywords = list(LANDMARK_KEYWORDS.keys())
 
+        # Text tokenization with padding/truncation
         text_inputs = clip_processor.tokenizer(
             keywords,
             padding=True,
             truncation=True,
             return_tensors="pt"
         )
-
-    
+        # Image feature extraction
         image_inputs = clip_processor.feature_extractor(
             images=image,
             return_tensors="pt"
         )
-
+        # Merge inputs
         inputs = {**text_inputs, **image_inputs}
 
+        # Forward pass
         with torch.no_grad():
             outputs = clip_model(**inputs)
-            probs = outputs.logits_per_image.softmax(dim=1).cpu().numpy().flatten()
-        
-        # Get top-k results for debugging
+            logits = outputs.logits_per_image  # shape (1, len(keywords))
+            probs = logits.softmax(dim=1).cpu().numpy().flatten()
+
+        # Top-k for debug
         top_idxs = probs.argsort()[::-1][:top_k]
         for rank, idx in enumerate(top_idxs, start=1):
             logger.info(f"CLIP rank {rank}: {keywords[idx]} -> {probs[idx]:.4f}")
-           
+
         best_idx = int(top_idxs[0])
         best_score = float(probs[best_idx])
         best_name = keywords[best_idx]
-        
 
         if best_score >= threshold:
-            logger.info(f"[CLIP MATCH] {best_name} ({best_score:.3f})\n")
+            logger.info(f"[CLIP MATCH] {best_name} ({best_score:.3f})")
             return best_name.lower()
         else:
-            logger.info(f"[CLIP LOW CONFIDENCE] best={best_name} ({best_score:.3f}), threshold={threshold}\n")
+            logger.info(
+                f"[CLIP LOW CONFIDENCE] best={best_name} ({best_score:.3f}), threshold={threshold}"
+            )
             return None
-            
     except Exception as e:
-        logger.info(f"[CLIP ERROR] {e}")
+        logger.error(f"[CLIP ERROR] {e}")
         return None
-        
-def query_landmark_coords(landmark_name: str) -> tuple:
+
+
+def query_landmark_coords(
+    landmark_name: str
+) -> Tuple[Optional[Tuple[float, float]], str]:
     """
-    Return ((lat, lon), source) if landmark name is found in predefined list or Overpass API.
-    Returns (None, error_message) if not found.
+    Given a landmark keyword, return (lat, lon) and source.
+    First checks predefined dict; if missing, queries Overpass API.
     """
-    # Check predefined landmarks first
-    key=landmark_name.lower()
+    key = landmark_name.lower()
     if key in LANDMARK_KEYWORDS:
         _, _, lat, lon = LANDMARK_KEYWORDS[key]
         return (lat, lon), "Predefined"
 
-    # Try Overpass API as fallback
+    # Build Overpass QL
     query = f"""
     [out:json][timeout:25];
     (
@@ -153,19 +160,23 @@ def query_landmark_coords(landmark_name: str) -> tuple:
     out center;
     """
 
-    try:
-        response = requests.post(OVERPASS_URL, data=query, timeout=15)
-        response.raise_for_status() 
-        data = response.json()
-        elements = data.get("elements", [])
-        if elements:
-            elem = elements[0]
-            if "center" in elem:
-                return (elem["center"]["lat"], elem["center"]["lon"]), "Overpass"
-            elif "lat" in elem and "lon" in elem:
-                return (elem["lat"], elem["lon"]), "Overpass"
-
-    except Exception as e:
-        logger.error(f"[OVERPASS ERROR] {e}")
+    # Try up to 3 times
+    for attempt in range(1, 4):
+        try:
+            resp = requests.post(OVERPASS_URL, data=query, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            elements = data.get("elements", [])
+            if elements:
+                elem = elements[0]
+                if "center" in elem:
+                    lat = elem["center"]["lat"]
+                    lon = elem["center"]["lon"]
+                    return (lat, lon), "Overpass"
+                elif "lat" in elem and "lon" in elem:
+                    return (elem["lat"], elem["lon"]), "Overpass"
+            logger.warning(f"[OVERPASS] No elements found (attempt {attempt})")
+        except Exception as e:
+            logger.warning(f"[OVERPASS attempt {attempt}] {e}")
 
     return None, "No coordinates available"
