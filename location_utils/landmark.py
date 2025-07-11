@@ -65,7 +65,7 @@ LANDMARK_KEYWORDS = {
     "Piazza dei Miracoli, Pisa, Tuscany, Italy":    ["Piazza dei Miracoli",    "Pisa", 43.7230, 10.3966],
 
     # America
-    " Golden Gate Bridge, San Francisco, California, United States": ["Golden Gate Bridge", "San Francisco", 37.8199, -122.4783],
+    "Golden Gate Bridge, San Francisco, California, United States": ["Golden Gate Bridge", "San Francisco", 37.8199, -122.4783],
     "Times Square, New York, United States": ["Times Square", "New York", 40.7580, -73.9855],
     "Hollywood Sign, Los Angeles, USA": ["Hollywood Sign", "Los Angeles", 34.1341, -118.3215],
     "Statue of Liberty, New York, United States": ["Statue of Liberty", "New York", 40.6892, -74.0445],
