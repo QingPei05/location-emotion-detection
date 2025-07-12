@@ -8,31 +8,31 @@ class EmotionDetector:
         self.color_map = get_config()["color_map"]
 
     def detect_emotions(self, img):
-        """Detect emotions using DeepFace"""
-        try:
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            results = DeepFace.analyze(
-                img_path=img_rgb,
-                actions=['emotion'],
-                enforce_detection=False,
-                detector_backend='opencv',
-                silent=True
-            )
-            
-            detections = []
-            for result in results:
-                detections.append({
-                    "emotion": result['dominant_emotion'],
-                    "confidence": round(result['emotion'][result['dominant_emotion']], 2),
-                    "x": result['region']['x'],
-                    "y": result['region']['y'],
-                    "w": result['region']['w'],
-                    "h": result['region']['h']
-                })
-            return detections
-        except Exception as e:
-            print(f"Detection error: {e}")
-            return []
+    """Detect emotions using DeepFace"""
+    try:
+        # 直接使用BGR图像，避免不必要的颜色转换
+        results = DeepFace.analyze(
+            img_path=img,  # 直接传入图像而不是路径
+            actions=['emotion'],
+            enforce_detection=False,
+            detector_backend='fastmtcnn',  # 使用更快的检测器
+            silent=True
+        )
+        
+        detections = []
+        for result in results:
+            detections.append({
+                "emotion": result['dominant_emotion'],
+                "confidence": round(result['emotion'][result['dominant_emotion']], 2),
+                "x": result['region']['x'],
+                "y": result['region']['y'],
+                "w": result['region']['w'],
+                "h": result['region']['h']
+            })
+        return detections
+    except Exception as e:
+        print(f"Detection error: {e}")
+        return []
 
     def draw_detections(self, img, detections):
         """Draw detection boxes with labels"""
