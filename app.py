@@ -268,7 +268,7 @@ def show_user_history(username):
                             if selected_indices:
                                 try:
                                     timestamps_to_delete = grouped.loc[selected_indices, "timestamp"].tolist()
-                                    df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete))]
+                                    df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
                                     df.to_csv("history.csv", index=False)
                                     st.success("Selected records deleted successfully!")
                                     st.session_state.select_all_state = False
