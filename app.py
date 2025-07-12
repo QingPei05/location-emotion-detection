@@ -1,27 +1,19 @@
-import os
-import sys
-import streamlit as st
+import os, streamlit as st
+import sys, subprocess
 import cv2
 import numpy as np
 from PIL import Image
 import pandas as pd
 from datetime import datetime
+import random
 import plotly.express as px
+from emotion_utils.detector import EmotionDetector
 import hashlib
 import tempfile
-import concurrent.futures
+from location_utils.extract_gps import extract_gps, convert_gps
+from location_utils.geocoder import get_address_from_coords
+from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
 
-# Fix module import paths
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-
-try:
-    from emotion_utils.detector import EmotionDetector
-    from location_utils.extract_gps import extract_gps, convert_gps
-    from location_utils.geocoder import get_address_from_coords
-    from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
-except ImportError as e:
-    st.error(f"Module import error: {str(e)}")
-    st.stop()
 
 # ----------------- App Configuration -----------------
 st.set_page_config(
