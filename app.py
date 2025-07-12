@@ -32,20 +32,16 @@ def authenticate(username, password):
 def register_user(username, password):
     """Register new user"""
     try:
-        # Check if username already exists
         if os.path.exists("users.csv"):
             users = pd.read_csv("users.csv")
             if username in users["username"].values:
                 return False
         
-        # Hash the password
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
         
-        # Create new user record
         new_user = pd.DataFrame([[username, hashed_password]], 
                               columns=["username", "password"])
         
-        # Append to existing users or create new file
         if os.path.exists("users.csv"):
             new_user.to_csv("users.csv", mode='a', header=False, index=False)
         else:
@@ -76,15 +72,14 @@ def get_detector():
 @functools.lru_cache(maxsize=32)
 def detect_emotions_cached(image_bytes):
     detector = get_detector()
-    # Convert bytes back to numpy array
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     return detector.detect_emotions(img)
 
-@functools.lru_cache(maxsize=32)  # Cache up to 32 recent images
-def detect_landmark_cached(image_path, threshold=0.15, top_k=5):
+@functools.lru_cache(maxsize=32)
+def detect_landmark_cached(image_path):
     processor, clip_model = load_models_cached()
-    return detect_landmark(image_path, processor, clip_model, threshold, top_k)
+    return detect_landmark(image_path, processor, clip_model)
 
 def save_history(username, emotions, confidences, location):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -153,8 +148,7 @@ def show_loc_detection_guide():
         """)
 
 def sidebar_design(username):
-    """Design the sidebar with user info and navigation"""
-    if username:  # Only show if username exists
+    if username:
         st.sidebar.success(f"👤 Logged in as: {username}")
     
     st.sidebar.markdown("---")
@@ -176,7 +170,6 @@ def sidebar_design(username):
         st.rerun()
 
 def show_user_history(username):
-    """Show user-specific history in main content area"""
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -232,7 +225,7 @@ def show_user_history(username):
                             if selected_indices:
                                 try:
                                     timestamps_to_delete = grouped.loc[selected_indices, "timestamp"].tolist()
-                                    df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
+                                    df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete))]
                                     df.to_csv("history.csv", index=False)
                                     st.success("Selected records deleted successfully!")
                                     st.session_state.select_all_state = False
@@ -326,25 +319,6 @@ def signup_page():
             st.rerun()
 
 # ----------------- Main App -----------------
-import os, streamlit as st
-import sys, subprocess
-import cv2
-import numpy as np
-from PIL import Image
-import pandas as pd
-from datetime import datetime
-import random
-import plotly.express as px
-from emotion_utils.detector import EmotionDetector
-import hashlib
-import tempfile
-from location_utils.extract_gps import extract_gps, convert_gps
-from location_utils.geocoder import get_address_from_coords
-from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
-import functools
-
-# [Previous code remains exactly the same until the main_app function]
-
 def main_app():
     username = st.session_state.get("username", "")
     sidebar_design(username)
@@ -377,7 +351,6 @@ def main_app():
                         img_array = np.array(image)
                         img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
                         
-                        # Convert image to bytes for caching
                         _, img_bytes = cv2.imencode('.jpg', img)
                         detections = detect_emotions_cached(img_bytes.tobytes())
                         
@@ -392,7 +365,6 @@ def main_app():
                             coords = None
                             face_word = "Face" if len(detections) == 1 else "Faces"
 
-                            # Try EXIF GPS first
                             gps_info = extract_gps(temp_path)
                             if gps_info:
                                 coords = convert_gps(gps_info)
@@ -401,7 +373,6 @@ def main_app():
                                     st.session_state.location_method = "GPS Metadata"
                                     location = get_address_from_coords(coords)
                                     
-                            # Fallback to CLIP landmark
                             if coords is None and landmark:
                                 coords_loc, source = query_landmark_coords(landmark)
                                 if coords_loc:
@@ -418,7 +389,6 @@ def main_app():
                                             lat, lon = coords_loc
                                             location = f"{landmark.title()} ({lat:.4f}, {lon:.4f})"
 
-                            # Display results
                             col1, col2 = st.columns([1, 2])
                             with col1:
                                 st.subheader("🔍 Detection Results")
@@ -461,7 +431,6 @@ def main_app():
                         else:
                             st.warning("No faces were detected in the uploaded image.")
 
-                        # Cleanup temp file
                         if os.path.exists(temp_path):
                             os.remove(temp_path)
 
