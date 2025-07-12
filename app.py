@@ -481,6 +481,13 @@ def main_app():
             coords_result = st.session_state.get("coords_result", None)
             method = st.session_state.get("location_method", "")
             landmark = st.session_state.get("landmark", "N/A")
+            
+            # Initialize location variable
+            location = "Unknown"
+            if coords_result:
+                # Get location from coordinates if available
+                location = get_address_from_coords(coords_result)
+            
             if coords_result and location != "Unknown":
                 lat, lon = coords_result
                 map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
