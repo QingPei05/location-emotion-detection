@@ -13,16 +13,9 @@ logger = logging.getLogger(__name__)
 
 @st.cache_resource  
 def load_models():
-    logger.info("Loading optimized CLIP model...")
-    # 使用更轻量级的模型
-    processor = CLIPProcessor.from_pretrained(
-        "openai/clip-vit-base-patch16",  # 比patch32更快的版本
-        cache_dir="model_cache"  # 避免重复下载
-    )
-    model = CLIPModel.from_pretrained(
-        "openai/clip-vit-base-patch16",
-        cache_dir="model_cache"
-    )
+    logger.info("Loading CLIP processor and model...")  
+    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
     return processor, model
 
 
