@@ -472,7 +472,22 @@ def main_app():
             coords_result = st.session_state.get("coords_result", None)
             method = st.session_state.get("location_method", "")
             landmark = st.session_state.get("landmark", "N/A")
-            if coords_result and location != "Unknown":
+            
+            # Get location string safely
+            location = "Unknown"
+            if coords_result:
+                location = get_address_from_coords(coords_result)
+                if location in ("Unknown location", "Geocoding service unavailable"):
+                    if landmark:
+                        info = LANDMARK_KEYWORDS.get(landmark)
+                        if info:
+                            location = f"{info[0]}, {info[1]}"
+                        else:
+                            location = f"{landmark.title()} ({coords_result[0]:.4f}, {coords_result[1]:.4f})"
+                    else:
+                        location = f"GPS: {coords_result[0]:.4f}, {coords_result[1]:.4f}"
+            
+            if coords_result:
                 lat, lon = coords_result
                 map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
                 st.write(f"🔍 CLIP predicted landmark: **{landmark}**")
