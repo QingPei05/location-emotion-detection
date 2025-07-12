@@ -164,6 +164,8 @@ def sidebar_design(username):
         st.session_state.show_history = False
         st.rerun()
 
+# [Previous code remains exactly the same until show_user_history function]
+
 def show_user_history(username):
     """Show user-specific history in main content area"""
     # Add back button in top right
@@ -199,8 +201,11 @@ def show_user_history(username):
                     # Add index starting from 1
                     grouped.index = grouped.index + 1
                     
-                    # Rename timestamp to Time for display
-                    grouped_display = grouped.rename(columns={"timestamp": "Time"})
+                    # Create display version with index and formatted time
+                    grouped_display = grouped.copy()
+                    grouped_display['Index'] = grouped.index
+                    grouped_display['Time'] = grouped['timestamp']
+                    grouped_display['Display Time'] = grouped.index.astype(str) + '. ' + grouped['timestamp']
                     
                     # Display table with checkboxes in last column
                     st.markdown("**📝 Records**")
@@ -214,8 +219,8 @@ def show_user_history(username):
                     
                     # Display non-editable table with checkboxes
                     edited_df = st.data_editor(
-                        grouped_display[["Location", "Emotion", "Time", "Select"]],
-                        disabled=["Location", "Emotion", "Time"],
+                        grouped_display[["Index", "Location", "Emotion", "Time", "Select"]],
+                        disabled=["Index", "Location", "Emotion", "Time"],
                         hide_index=True,
                         use_container_width=True
                     )
@@ -248,23 +253,27 @@ def show_user_history(username):
                     # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
                     st.markdown("**📊 Emotion Distribution**")
-                                                                                                                                                                                                                                                            
+                    
                     # Create columns for the selection and chart
                     col_select, col_chart = st.columns([2, 5])
                     
                     with col_select:
+                        # Create options with index + timestamp
+                        options = ["All"] + [f"{idx}. {row['timestamp']}" 
+                                            for idx, row in grouped.iterrows()]
+                        
                         # Add record selection for chart
-                        records = grouped["timestamp"].tolist()
-                        records.insert(0, "All")  # Add "All" option
                         selected_record = st.selectbox("Select record to view:", 
-                                                     ["All"] + [str(ts) for ts in grouped["timestamp"].tolist()], 
+                                                     options, 
                                                      index=0)
 
                         # Filter data based on selection
                         if selected_record == "All":
                             chart_data = user_df
                         else:
-                            chart_data = user_df[user_df["timestamp"] == selected_record]
+                            # Extract the timestamp from the selected option
+                            selected_timestamp = selected_record.split('. ', 1)[1]
+                            chart_data = user_df[user_df["timestamp"] == selected_timestamp]
 
                     with col_chart:
                         # Display chart with simplified title
