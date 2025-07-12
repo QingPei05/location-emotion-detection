@@ -73,12 +73,13 @@ def load_models_cached():
 def get_detector():
     return EmotionDetector()
 
-@functools.lru_cache(maxsize=32)  # Cache up to 32 recent images
+@functools.lru_cache(maxsize=32)
 def detect_emotions_cached(image_bytes):
     detector = get_detector()
-    img_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    img_array = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-    return detector.detect_emotions(img_array)
+    # Convert bytes back to numpy array
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    return detector.detect_emotions(img)
 
 @functools.lru_cache(maxsize=32)  # Cache up to 32 recent images
 def detect_landmark_cached(image_path, threshold=0.15, top_k=5):
@@ -346,20 +347,20 @@ def main_app():
 
         with tabs[0]:
             uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-            if uploaded_file:
-                with st.spinner("Processing image..."):
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                        tmp_file.write(uploaded_file.read())
-                        temp_path = tmp_file.name
-                        
-                    try:
-                        image = Image.open(uploaded_file).convert("RGB")
-                        img_array = np.array(image)
-                        img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-                        
-                        # Convert image to bytes for caching
-                        _, img_bytes = cv2.imencode('.jpg', img)
-                        detections = detect_emotions_cached(tuple(img_bytes.tobytes()))
+           if uploaded_file:
+               with st.spinner("Processing image..."):
+                   with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+                       tmp_file.write(uploaded_file.read())
+                       temp_path = tmp_file.name
+                   
+                   try:
+                       image = Image.open(uploaded_file).convert("RGB")
+                       img_array = np.array(image)
+                       img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            
+                       # Convert image to bytes for caching
+                       _, img_bytes = cv2.imencode('.jpg', img)
+                       detections = detect_emotions_cached(img_bytes.tobytes())  
                         
                         if detections:
                             detector = get_detector()
