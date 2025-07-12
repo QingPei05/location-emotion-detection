@@ -11,8 +11,8 @@ import hashlib
 import tempfile
 import concurrent.futures
 
-# Fix module import paths
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Fix module import paths - THIS IS CRUCIAL
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 try:
     from emotion_utils.detector import EmotionDetector
@@ -20,7 +20,21 @@ try:
     from location_utils.geocoder import get_address_from_coords
     from location_utils.landmark import LANDMARK_KEYWORDS, detect_landmark, query_landmark_coords
 except ImportError as e:
-    st.error(f"Module import error: {str(e)}")
+    st.error(f"Failed to import required modules: {str(e)}")
+    st.error("Please ensure your project structure is correct:")
+    st.error("""
+    your_project/
+    ├── emotion_utils/
+    │   ├── __init__.py
+    │   ├── detector.py
+    │   └── config.py
+    ├── location_utils/
+    │   ├── __init__.py
+    │   ├── extract_gps.py
+    │   ├── geocoder.py
+    │   └── landmark.py
+    └── app.py
+    """)
     st.stop()
 
 # ----------------- App Configuration -----------------
