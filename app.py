@@ -13,7 +13,6 @@ import tempfile
 from location_utils.extract_gps import extract_gps, convert_gps
 from location_utils.geocoder import get_address_from_coords
 from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
-from functools import lru_cache
 
 # ----------------- User Authentication -----------------
 def authenticate(username, password):
@@ -65,23 +64,13 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def load_models_once():
-    """集中加载所有模型"""
-    from location_utils.landmark import load_models
-    from emotion_utils.detector import EmotionDetector
-    return {
-        "clip_processor": load_models()[0],
-        "clip_model": load_models()[1],
-        "emotion_detector": EmotionDetector()
-    }
+def get_detector():
+    return EmotionDetector()
 
-models = load_models_once()
-detector = models["emotion_detector"]
+detector = get_detector()
 
-# 在文件上传处理部分添加进度指示
-with st.spinner('Analyzing image...'):
-    detections = detector.detect_emotions(img)
-
+# Load CLIP models once
+processor, clip_model = load_models()
 
 def save_history(username, emotions, confidences, location):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -98,22 +87,55 @@ def save_history(username, emotions, confidences, location):
     except Exception as e:
         st.error(f"Failed to save history: {e}")
 
-def show_detection_guide():
+def gradient_card(subtitle):
+    if subtitle:
+        subtitle_html = f'<p style="color: #333; font-size: 1.2rem;">{subtitle}</p>'
+    else:
+        subtitle_html = "" 
+
+    st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, #fef9ff, #e7e7f9);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+            text-align: center;
+            border: 1px solid #ddd;
+            margin-bottom: 2rem;
+        ">
+            <h1 style="color: #5a189a; font-size: 2.8rem;">👁‍🗨 Perspēct</h1>
+            {subtitle_html}
+        </div>
+    """, unsafe_allow_html=True)
+
+def show_emo_detection_guide():
     with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
         st.markdown("""
         *Detection Logic Explained:*
-        - 😊 Happy: Smile present, cheeks raised
-        - 😠 Angry: Eyebrows lowered, eyes wide open
-        - 😐 Neutral: No strong facial movements
-        - 😢 Sad: Eyebrows raised, lip corners down
-        - 😲 Surprise: Eyebrows raised, mouth open
-        - 😨 Fear: Eyes tense, lips stretched
-        - 🤢 Disgust: Nose wrinkled, upper lip raised
-
+        - 😊 **Happy**: Smile present, cheeks raised
+        - 😠 **Angry**: Eyebrows lowered, eyes wide open
+        - 😐 **Neutral**: No strong facial movements
+        - 😢 **Sad**: Eyebrows raised, lip corners down
+        - 😲 **Surprise**: Eyebrows raised, mouth open
+        - 😨 **Fear**: Eyes tense, lips stretched
+        - 🤢 **Disgust**: Nose wrinkled, upper lip raised
+        
         *Tips for Better Results:*
         - Use clear, front-facing images
         - Ensure good lighting
         - Avoid obstructed faces
+        """)
+
+def show_loc_detection_guide():
+    with st.expander("ℹ️ How Location Detection Works", expanded=False):
+        st.markdown("""
+        *How It Works:*
+        - If your image contains **GPS metadata** (EXIF), the system will extract coordinates and estimate location.
+        - If no GPS is available, it uses **landmark recognition** powered by a vision-language AI model (CLIP) to estimate location based on visual clues in the image.
+
+        *Tips for Better Location Results:*
+        - For GPS: Use original images taken by smartphones (not screenshots or edited).
+        - For Landmark: Ensure the image includes distinctive landmarks (e.g. buildings, scenery).
         """)
 
 def sidebar_design(username):
@@ -226,7 +248,7 @@ def show_user_history(username):
                     # Add spacing between table and chart
                     st.markdown("<br><br>", unsafe_allow_html=True)
                     st.markdown("**📊 Emotion Distribution**")
-                    
+                                                                                                                                                                                                                                                            
                     # Create columns for the selection and chart
                     col_select, col_chart = st.columns([2, 5])
                     
@@ -259,7 +281,7 @@ def show_user_history(username):
 
 # ----------------- Login/Signup Pages -----------------
 def login_page():
-    st.title("👁‍🗨 Perspēct")
+    gradient_card(None)
     st.subheader("🕵️‍♂️ Sign In")
     
     with st.form("login_form"):
@@ -285,7 +307,7 @@ def login_page():
             st.rerun()
 
 def signup_page():
-    st.title("👁‍🗨 Perspēct")
+    gradient_card(None)
     st.subheader("🕵️‍♂️ Sign Up")
     
     with st.form("signup_form"):
@@ -324,22 +346,11 @@ def main_app():
         st.session_state.coords_result = None
     if "location_method" not in st.session_state:
         st.session_state.location_method = ""
-    
-    st.markdown("""
-    <div style="
-        background-color: #f8f8e7;
-        padding: 1.5rem;
-        border-radius: 12px;
-        text-align: center;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    ">
-        <h1 style="color: #333333; font-family: 'Segoe UI', sans-serif;">👁‍🗨 Perspēct</h1>
-        <p style="font-size: 1.1rem; color: #555555; font-family: 'Segoe UI', sans-serif;">
-            Upload a photo to detect facial emotions and estimate location.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    if "landmark" not in st.session_state:
+        st.session_state.landmark = None
 
+    subtitle = "Upload a photo to detect facial emotions and estimate location."
+    gradient_card(subtitle)
     
     # Show history if toggled, otherwise show regular tabs
     if st.session_state.get('show_history', False):
@@ -354,25 +365,17 @@ def main_app():
                     tmp_file.write(uploaded_file.read())
                     temp_path = tmp_file.name
                     
-                    with st.spinner('Detecting emotions...'):
-                        image = Image.open(uploaded_file).convert("RGB")
-                        img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-                        detections = detector.detect_emotions(img)
-    
-    # 只有检测到人脸时才继续处理位置信息
-    if detections:
-        with st.spinner('Detecting location...'):
-                    
                 try:
                     image = Image.open(uploaded_file).convert("RGB")
                     img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
                     detector = EmotionDetector()
                     detections = detector.detect_emotions(img)
                     detected_img = detector.draw_detections(img, detections)
-
+                    
+                    landmark = None 
                     location = "Unknown"
                     coords = None
-                    face_word = "face" if len(detections) == 1 else "faces"
+                    face_word = "Face" if len(detections) == 1 else "Faces"
 
                     # 1) Try EXIF GPS
                     gps_info = extract_gps(temp_path)
@@ -386,8 +389,8 @@ def main_app():
                     # 2) Fallback to CLIP landmark
                     if coords is None:
                         landmark = detect_landmark(temp_path, threshold=0.15, top_k=5)
+                        st.session_state.landmark = landmark
                         if landmark:
-                            st.write(f"🔍 CLIP predicted landmark: **{landmark}**")
                             coords_loc, source = query_landmark_coords(landmark)
                             if coords_loc:
                                 st.session_state.coords_result = coords_loc
@@ -416,26 +419,35 @@ def main_app():
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         st.subheader("🔍 Detection Results")
+                        st.markdown("<hr style='margin-top: 0;'>", unsafe_allow_html=True)
                         if detections:
                             emotions = [d["emotion"] for d in detections]
                             confidences = [d["confidence"] for d in detections]
                             
-                            st.success(f"🎭 {len(detections)} {face_word} detected")
-                            for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-                                st.write(f"- Face {i + 1}: {emo} ({conf}%)")
-                            
+                            st.success(f"🎭 **{len(detections)}** {face_word} Detected")
+
                             # Add emotion totals
                             emotion_counts = {}
                             for emo in emotions:
                                 emotion_counts[emo] = emotion_counts.get(emo, 0) + 1
-                            total_text = "Total: " + ", ".join([f"{count} {emo}" for emo, count in emotion_counts.items()])
-                            st.write(total_text)
-                            
-                            show_detection_guide()
+                                
+                            with st.expander("Click to view face details"):
+                                for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                                    st.markdown(f"""
+                                        <div style="padding-left: 10px; margin-bottom: 8px;">
+                                            <strong>Face {i + 1}</strong>: {emo.title()}  
+                                            <br>Confidence: {conf:.1f}%
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                st.markdown("<hr style='border: none; border-top: 1px solid #ccc;'>", unsafe_allow_html=True)
+                                total_text = "Total: " + ", ".join([f"{count} {emo}" for emo, count in emotion_counts.items()])
+                                st.write(f"**{total_text}**")
+                                
                             method = st.session_state.get("location_method", "")
-                            st.write(
-                                f"📍 Estimated Location: **{location}** "
-                            )
+                            st.success(f"📍 Estimated Location: **{location}** ")
+                            st.divider()
+                            show_emo_detection_guide()
                             save_history(username, emotions, confidences, location)
                         else:
                             st.warning("No faces were detected in the uploaded image.")
@@ -455,16 +467,23 @@ def main_app():
 
         with tabs[1]:
             st.subheader("🗺️ Detected Location Map")
+            st.markdown("<hr style='width: 325px; margin-top: 0;'>", unsafe_allow_html=True)
+            
             coords_result = st.session_state.get("coords_result", None)
             method = st.session_state.get("location_method", "")
-            if coords_result:
+            landmark = st.session_state.get("landmark", "N/A")
+            if coords_result and location != "Unknown":
                 lat, lon = coords_result
                 map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
+                st.write(f"🔍 CLIP predicted landmark: **{landmark}**")
+                st.write(f"📍 Estimated Location: **{location}** ")
+                st.caption("**Combined detection** lets the system analyze emotion and location in a single image.")
+                show_loc_detection_guide()
                 st.map(map_df)
-                st.caption(f"Source: {method}")
             else:
-                st.info("No detected location to display on map.")
-            
+                st.write(f"🔍 CLIP predicted landmark: **{landmark}**")
+                st.warning("📍 Estimated Location is unknown, so the map is not displayed.")
+                
 # ----------------- Run App -----------------
 if __name__ == "__main__":
     # Initialize session state variables
