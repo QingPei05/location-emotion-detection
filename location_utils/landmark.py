@@ -23,7 +23,7 @@ def load_models():
 # Preload models at module level
 clip_processor, clip_model = load_models()
 
-# Predefined landmarks with name, city, latitude, longitude
+# Complete predefined landmarks with name, city, latitude, longitude
 LANDMARK_KEYWORDS = {
     # Malaysia landmarks
     "petronas towers": ["Petronas Twin Towers", "Kuala Lumpur", 3.1579, 101.7116],
@@ -31,7 +31,54 @@ LANDMARK_KEYWORDS = {
     "kl tower": ["KL Tower", "Kuala Lumpur", 3.1528, 101.7039],
     "batu caves": ["Batu Caves", "Selangor", 3.2379, 101.6831],
     "putrajaya pink mosque": ["Putra Mosque", "Putrajaya", 2.9360, 101.6895],
-    # ... (keep all your existing landmarks)
+    "kuala lumpur blue mosque": ["Sultan Salahuddin Abdul Aziz Mosque", "Kuala Lumpur", 3.0788, 101.5031],
+    "masjid putra": ["Putra Mosque", "Putrajaya", 2.9360, 101.6895],
+    "iron mosque": ["Tuanku Mizan Zainal Abidin Mosque", "Putrajaya", 2.9266, 101.6804],
+    "sultan abdul samad building": ["Sultan Abdul Samad Building", "Kuala Lumpur", 3.1466, 101.6945],
+    "istana negara": ["Istana Negara", "Kuala Lumpur", 3.1339, 101.6842],
+    "malacca straits mosque": ["Masjid Selat Melaka", "Malacca", 2.1885, 102.2497],
+    "george town street art": ["George Town Street Art", "Penang", 5.4141, 100.3288],
+    "komtar": ["Komtar Tower", "Penang", 5.4143, 100.3288],
+    "kek lok si": ["Kek Lok Si Temple", "Penang", 5.3991, 100.2736],
+    "penang hill": ["Penang Hill", "Penang", 5.4163, 100.2766],
+    "langkawi sky bridge": ["Langkawi Sky Bridge", "Langkawi", 6.3847, 99.6636],
+    "gunung mat cincang": ["Gunung Mat Cincang", "Langkawi", 6.3790, 99.6652],
+    "genting highlands": ["Genting Highlands", "Pahang", 3.4221, 101.7934],
+    "legoland malaysia": ["Legoland Malaysia", "Johor", 1.4274, 103.6315],
+    "mount kinabalu": ["Mount Kinabalu", "Sabah", 6.0755, 116.5583],
+    "kinabalu park": ["Kinabalu Park", "Sabah", 6.0456, 116.6864],
+    "menara alor setar": ["Alor Setar Tower", "Kedah", 6.1219, 100.3716],
+    "penang bridge": ["Penang Bridge", "Penang", 5.3364, 100.3606],
+    "a famosa": ["A Famosa", "Melaka", 2.1912, 102.2501],
+    "sabah state mosque": ["Sabah State Mosque", "Kota Kinabalu", 5.9576, 116.0654],
+    "gunung kinabalu": ["Mount Kinabalu", "Sabah", 6.0754, 116.5584],
+
+    # Asia
+    "great wall": ["Great Wall of China", "China", 40.4319, 116.5704],
+    "burj khalifa": ["Burj Khalifa", "Dubai", 25.1972, 55.2744],
+    "taipei 101": ["Taipei 101", "Taipei", 25.0330, 121.5654],
+    "marina bay sands": ["Marina Bay Sands", "Singapore", 1.2834, 103.8607],
+
+    # Europe
+    "big ben": ["Big Ben", "London", 51.5007, -0.1246],
+    "louvre": ["Louvre Museum", "Paris", 48.8606, 2.3376],
+    "sagrada familia": ["Sagrada Família", "Barcelona", 41.4036, 2.1744],
+    "leaning tower of pisa": ["Leaning Tower of Pisa", "Pisa", 43.7230, 10.3966],
+    "piazza dei miracoli": ["Piazza dei Miracoli", "Pisa", 43.7230, 10.3966],
+
+    # America
+    "golden gate bridge": ["Golden Gate Bridge", "San Francisco", 37.8199, -122.4783],
+    "times square": ["Times Square", "New York", 40.7580, -73.9855],
+    "hollywood sign": ["Hollywood Sign", "Los Angeles", 34.1341, -118.3215],
+    "statue of liberty": ["Statue of Liberty", "New York", 40.6892, -74.0445],
+
+    # Others
+    "machu picchu": ["Machu Picchu", "Peru", -13.1631, -72.5450],
+    "christ the redeemer": ["Christ the Redeemer", "Rio de Janeiro", -22.9519, -43.2105],
+    "opera house": ["Sydney Opera House", "Sydney", -33.8568, 151.2153],
+    "sydney opera house": ["Sydney Opera House", "Sydney", -33.8568, 151.2153],
+    "eiffel tower": ["Eiffel Tower", "Paris", 48.8584, 2.2945],
+    "taj mahal": ["Taj Mahal", "Agra", 27.1751, 78.0421]
 }
 
 OVERPASS_URL = "http://overpass-api.de/api/interpreter"
@@ -39,25 +86,25 @@ OVERPASS_URL = "http://overpass-api.de/api/interpreter"
 def detect_landmark(
     image_path: str,
     threshold: float = 0.15,
-    top_k: int = 3  # Reduced from original 5 for faster processing
+    top_k: int = 3
 ) -> Optional[str]:
     """
     Optimized landmark detection using CLIP model.
     
     Args:
         image_path: Path to the image file
-        threshold: Confidence threshold for accepting a match
-        top_k: Number of top predictions to consider
+        threshold: Confidence threshold for accepting a match (default: 0.15)
+        top_k: Number of top predictions to consider (default: 3)
         
     Returns:
         Matched landmark name (lowercase) or None if no confident match
     """
     try:
         # Load and optimize image
-        image = Image.open(image_path).convert("RGB")
-        image = image.resize((224, 224))  # Standard size for faster processing
+        with Image.open(image_path) as img:
+            image = img.convert("RGB").resize((224, 224))
         
-        # Prepare inputs using preloaded processor
+        # Prepare inputs
         inputs = clip_processor(
             text=list(LANDMARK_KEYWORDS.keys()),
             images=image,
@@ -69,49 +116,45 @@ def detect_landmark(
         # Model inference
         with torch.no_grad():
             outputs = clip_model(**inputs)
-            logits = outputs.logits_per_image
-            probs = logits.softmax(dim=1).cpu().numpy().flatten()
+            probs = outputs.logits_per_image.softmax(dim=1).cpu().numpy().flatten()
 
-        # Get top predictions
-        top_idxs = probs.argsort()[::-1][:top_k]
-        for rank, idx in enumerate(top_idxs, start=1):
-            landmark_name = list(LANDMARK_KEYWORDS.keys())[idx]
-            logger.info(f"CLIP rank {rank}: {landmark_name} -> {probs[idx]:.4f}")
-
-        best_idx = top_idxs[0]
+        # Process results
+        best_idx = probs.argmax()
         best_score = probs[best_idx]
         best_name = list(LANDMARK_KEYWORDS.keys())[best_idx]
 
-        if best_score >= threshold:
-            logger.info(f"[CLIP MATCH] {best_name} ({best_score:.3f})")
-            return best_name.lower()
-        
-        logger.info(f"[CLIP LOW CONFIDENCE] best={best_name} ({best_score:.3f}), threshold={threshold}")
-        return None
+        # Log top predictions
+        top_idxs = probs.argsort()[::-1][:top_k]
+        for rank, idx in enumerate(top_idxs, 1):
+            logger.info(f"Rank {rank}: {list(LANDMARK_KEYWORDS.keys())[idx]} ({probs[idx]:.4f})")
+
+        return best_name.lower() if best_score >= threshold else None
 
     except Exception as e:
-        logger.error(f"[CLIP ERROR] {str(e)}")
+        logger.error(f"Landmark detection failed: {str(e)}")
         return None
 
 def query_landmark_coords(
-    landmark_name: str
+    landmark_name: str,
+    max_retries: int = 3
 ) -> Tuple[Optional[Tuple[float, float]], str]:
     """
-    Get coordinates for a landmark with fallback to Overpass API.
+    Get coordinates for a landmark with intelligent fallback logic.
     
     Args:
         landmark_name: Name of the landmark to search for
+        max_retries: Maximum number of API retries (default: 3)
         
     Returns:
         Tuple of (coordinates, source) or (None, error message)
     """
-    # First check predefined landmarks
+    # Check predefined landmarks first
     key = landmark_name.lower()
     if key in LANDMARK_KEYWORDS:
         _, _, lat, lon = LANDMARK_KEYWORDS[key]
         return (lat, lon), "Predefined"
 
-    # Fallback to Overpass API
+    # Prepare Overpass API query
     query = f"""
     [out:json][timeout:15];
     (
@@ -121,24 +164,25 @@ def query_landmark_coords(
     out center;
     """
 
-    for attempt in range(1, 4):
+    # Try with retries
+    for attempt in range(1, max_retries + 1):
         try:
             resp = requests.post(OVERPASS_URL, data=query, timeout=10)
             resp.raise_for_status()
-            data = resp.json()
             
-            if elements := data.get("elements", []):
+            if elements := resp.json().get("elements", []):
                 elem = elements[0]
-                if "center" in elem:
-                    return (elem["center"]["lat"], elem["center"]["lon"]), "Overpass"
+                if coords := elem.get("center", {}):
+                    return (coords["lat"], coords["lon"]), "Overpass"
                 elif "lat" in elem and "lon" in elem:
                     return (elem["lat"], elem["lon"]), "Overpass"
                 
-            logger.warning(f"[OVERPASS] No valid elements found (attempt {attempt})")
-        except Exception as e:
-            logger.warning(f"[OVERPASS attempt {attempt}] Error: {str(e)}")
-            if attempt < 3:
+            logger.warning(f"Overpass attempt {attempt}: No valid coordinates found")
+            
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Overpass attempt {attempt} failed: {str(e)}")
+            if attempt < max_retries:
                 import time
-                time.sleep(1)  # Brief delay before retry
+                time.sleep(1)  # Exponential backoff could be added here
 
-    return None, "No coordinates available"
+    return None, "No coordinates available after retries"
