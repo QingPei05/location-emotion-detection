@@ -13,6 +13,7 @@ import tempfile
 from location_utils.extract_gps import extract_gps, convert_gps
 from location_utils.geocoder import get_address_from_coords
 from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
+from functools import lru_cache
 
 # ----------------- User Authentication -----------------
 def authenticate(username, password):
@@ -64,13 +65,23 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def get_detector():
-    return EmotionDetector()
+def load_models_once():
+    """集中加载所有模型"""
+    from location_utils.landmark import load_models
+    from emotion_utils.detector import EmotionDetector
+    return {
+        "clip_processor": load_models()[0],
+        "clip_model": load_models()[1],
+        "emotion_detector": EmotionDetector()
+    }
 
-detector = get_detector()
+models = load_models_once()
+detector = models["emotion_detector"]
 
-# Load CLIP models once
-processor, clip_model = load_models()
+# 在文件上传处理部分添加进度指示
+with st.spinner('Analyzing image...'):
+    detections = detector.detect_emotions(img)
+
 
 def save_history(username, emotions, confidences, location):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -342,6 +353,15 @@ def main_app():
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
                     tmp_file.write(uploaded_file.read())
                     temp_path = tmp_file.name
+                    
+                    with st.spinner('Detecting emotions...'):
+                        image = Image.open(uploaded_file).convert("RGB")
+                        img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                        detections = detector.detect_emotions(img)
+    
+    # 只有检测到人脸时才继续处理位置信息
+    if detections:
+        with st.spinner('Detecting location...'):
                     
                 try:
                     image = Image.open(uploaded_file).convert("RGB")
