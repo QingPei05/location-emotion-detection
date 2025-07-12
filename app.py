@@ -11,30 +11,16 @@ import hashlib
 import tempfile
 import concurrent.futures
 
-# Fix module import paths - THIS IS CRUCIAL
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+# Fix module import paths
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 try:
     from emotion_utils.detector import EmotionDetector
     from location_utils.extract_gps import extract_gps, convert_gps
     from location_utils.geocoder import get_address_from_coords
-    from location_utils.landmark import LANDMARK_KEYWORDS, detect_landmark, query_landmark_coords
+    from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
 except ImportError as e:
-    st.error(f"Failed to import required modules: {str(e)}")
-    st.error("Please ensure your project structure is correct:")
-    st.error("""
-    your_project/
-    ├── emotion_utils/
-    │   ├── __init__.py
-    │   ├── detector.py
-    │   └── config.py
-    ├── location_utils/
-    │   ├── __init__.py
-    │   ├── extract_gps.py
-    │   ├── geocoder.py
-    │   └── landmark.py
-    └── app.py
-    """)
+    st.error(f"Module import error: {str(e)}")
     st.stop()
 
 # ----------------- App Configuration -----------------
@@ -47,14 +33,16 @@ st.set_page_config(
 
 # ----------------- Cached Resources -----------------
 @st.cache_resource
-def load_models():
+def load_all_models():
+    """Load and cache all ML models for better performance"""
     return {
         'emotion': EmotionDetector(),
+        'clip': load_models()  # CLIP models
     }
 
 @st.cache_data(ttl=3600, show_spinner="Processing image...")
-def process_uploaded_image(uploaded_file):
-    """Cache processed image data"""
+def process_image_file(uploaded_file):
+    """Cache processed image data to avoid redundant computations"""
     try:
         image = Image.open(uploaded_file).convert("RGB")
         img_np = np.array(image)
@@ -180,89 +168,128 @@ def show_loc_detection_guide():
         - Finally attempts to geocode any found coordinates
         """)
 
+# ----------------- Optimized Processing Functions -----------------
+def process_emotion_parallel(image_data, detector):
+    """Optimized emotion detection using cached image"""
+    try:
+        detections = detector.detect_emotions(image_data['img_bgr'])
+        detected_img = detector.draw_detections(image_data['img_bgr'], detections)
+        return detections, detected_img
+    except Exception as e:
+        st.error(f"Emotion detection failed: {str(e)}")
+        return [], None
+
+def process_location_parallel(temp_path):
+    """Optimized location detection with parallel processing"""
+    try:
+        # Try GPS first
+        if gps_info := extract_gps(temp_path):
+            if coords := convert_gps(gps_info):
+                return coords, "GPS Metadata"
+        
+        # Fallback to landmark detection
+        if landmark := detect_landmark(temp_path, threshold=0.15, top_k=3):  # Reduced top_k for speed
+            if coords_loc := query_landmark_coords(landmark)[0]:
+                return coords_loc, f"Landmark (CLIP)"
+        return None, ""
+    except Exception as e:
+        st.error(f"Location detection failed: {str(e)}")
+        return None, ""
+
 # ----------------- Main App -----------------
 def main_app():
-    models = load_models()
+    models = load_all_models()
     username = st.session_state.get("username", "")
-    
+    sidebar_design(username)
+
     # Initialize session state
-    for key in ['coords_result', 'location_method', 'landmark', 'show_history']:
-        st.session_state.setdefault(key, None)
+    st.session_state.setdefault('coords_result', None)
+    st.session_state.setdefault('location_method', "")
+    st.session_state.setdefault('landmark', None)
+    st.session_state.setdefault('show_history', False)
 
     gradient_card("Upload a photo to detect facial emotions and estimate location")
     
-    tabs = st.tabs(["🏠 Home", "🗺️ Location Map"])
-    
-    with tabs[0]:
-        if uploaded_file := st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"]):
-            image_data = process_uploaded_image(uploaded_file)
-            
-            if image_data:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                    tmp_file.write(uploaded_file.getvalue())
-                    temp_path = tmp_file.name
+    if st.session_state.show_history:
+        show_user_history(username)
+    else:
+        tabs = st.tabs(["🏠 Home", "🗺️ Location Map"])
+
+        with tabs[0]:
+            if uploaded_file := st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"]):
+                # Process image (cached)
+                image_data = process_image_file(uploaded_file)
                 
-                try:
-                    with st.spinner('Analyzing image...'):
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            emotion_future = executor.submit(process_emotion, image_data, models['emotion'])
-                            location_future = executor.submit(process_location, temp_path)
-                            
-                            detections, detected_img = emotion_future.result()
-                            coords, method = location_future.result()
-                            
-                        st.session_state.update({
-                            'coords_result': coords,
-                            'location_method': method,
-                            'landmark': detect_landmark(temp_path) if coords else None
-                        })
-                        
-                        if detections:
-                            emotions = [d["emotion"] for d in detections]
-                            confidences = [d["confidence"] for d in detections]
-                            face_word = "face" if len(detections) == 1 else "faces"
-                            
-                            col1, col2 = st.columns([1, 2])
-                            with col1:
-                                st.subheader("🔍 Detection Results")
-                                st.success(f"🎭 {len(detections)} {face_word} detected")
+                if image_data:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+                        tmp_file.write(uploaded_file.getvalue())
+                        temp_path = tmp_file.name
+                    
+                    try:
+                        with st.spinner('Analyzing image...'):
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                # Parallel processing
+                                emotion_future = executor.submit(
+                                    process_emotion_parallel, 
+                                    image_data, 
+                                    models['emotion']
+                                )
+                                location_future = executor.submit(
+                                    process_location_parallel,
+                                    temp_path
+                                )
                                 
-                                with st.expander("View details"):
-                                    for i, (emo, conf) in enumerate(zip(emotions, confidences)):
-                                        st.write(f"**Face {i+1}**: {emo.title()} ({conf:.1f}%)")
+                                detections, detected_img = emotion_future.result()
+                                coords, method = location_future.result()
+                                
+                            # Update session state
+                            st.session_state.update({
+                                'coords_result': coords,
+                                'location_method': method,
+                                'landmark': detect_landmark(temp_path) if coords else None
+                            })
+                            
+                            # Display results
+                            if detections:
+                                emotions = [d["emotion"] for d in detections]
+                                confidences = [d["confidence"] for d in detections]
+                                face_word = "face" if len(detections) == 1 else "faces"
+                                
+                                col1, col2 = st.columns([1, 2])
+                                with col1:
+                                    st.subheader("🔍 Detection Results")
+                                    st.success(f"🎭 {len(detections)} {face_word} detected")
                                     
-                                    st.write("**Summary**:", ", ".join(
-                                        f"{emotions.count(e)} {e}" for e in set(emotions)
-                                    ))
+                                    with st.expander("View details"):
+                                        for i, (emo, conf) in enumerate(zip(emotions, confidences)):
+                                            st.write(f"**Face {i+1}**: {emo.title()} ({conf:.1f}%)")
+                                        
+                                        st.write("**Summary**:", ", ".join(
+                                            f"{emotions.count(e)} {e}" for e in set(emotions)
+                                        ))
+                                    
+                                    location = get_location_string()
+                                    st.success(f"📍 {location}")
+                                    save_history(username, emotions, confidences, location)
                                 
-                                location = get_location_string()
-                                st.success(f"📍 {location}")
-                                save_history(username, emotions, confidences, location)
-                            
-                            with col2:
-                                tab1, tab2 = st.tabs(["Original", "Processed"])
-                                with tab1:
-                                    st.image(image_data['pil_image'], use_column_width=True)
-                                with tab2:
-                                    st.image(detected_img, channels="BGR", use_column_width=True,
-                                           caption=f"Detected {len(detections)} {face_word}")
-                        else:
-                            st.warning("No faces detected in the image")
-                
-                finally:
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
-    
-    with tabs[1]:
-        st.subheader("🗺️ Location Map")
-        if coords := st.session_state.coords_result:
-            st.write(f"**Method**: {st.session_state.location_method}")
-            st.write(f"**Location**: {get_location_string()}")
-            st.map(pd.DataFrame({"lat": [coords[0]], "lon": [coords[1]]}))
-        else:
-            st.warning("No location data available")
+                                with col2:
+                                    tab1, tab2 = st.tabs(["Original", "Processed"])
+                                    with tab1:
+                                        st.image(image_data['pil_image'], use_column_width=True)
+                                    with tab2:
+                                        st.image(detected_img, channels="BGR", use_column_width=True,
+                                               caption=f"Detected {len(detections)} {face_word}")
+                            else:
+                                st.warning("No faces detected in the image")
+                    finally:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+
+        with tabs[1]:
+            display_location_map()
 
 def get_location_string():
+    """Generate location description from session state"""
     if not st.session_state.coords_result:
         return "Location unknown"
     
@@ -276,6 +303,16 @@ def get_location_string():
             return f"{info[0]}, {info[1]}"
         return f"{landmark.title()} ({coords[0]:.4f}, {coords[1]:.4f})"
     return f"GPS: {coords[0]:.4f}, {coords[1]:.4f}"
+
+def display_location_map():
+    """Show location map if coordinates exist"""
+    st.subheader("🗺️ Location Map")
+    if coords := st.session_state.coords_result:
+        st.write(f"**Method**: {st.session_state.location_method}")
+        st.write(f"**Location**: {get_location_string()}")
+        st.map(pd.DataFrame({"lat": [coords[0]], "lon": [coords[1]]}))
+    else:
+        st.warning("No location data available")
 
 # ----------------- Authentication Pages -----------------
 def login_page():
@@ -339,8 +376,9 @@ def signup_page():
 # ----------------- Run App -----------------
 if __name__ == "__main__":
     # Initialize session state
-    for key in ['logged_in', 'show_signup', 'username', 'show_history']:
-        st.session_state.setdefault(key, False if key != 'username' else "")
+    st.session_state.setdefault('logged_in', False)
+    st.session_state.setdefault('show_signup', False)
+    st.session_state.setdefault('username', "")
     
     if not st.session_state.logged_in:
         if st.session_state.show_signup:
