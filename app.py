@@ -326,6 +326,25 @@ def signup_page():
             st.rerun()
 
 # ----------------- Main App -----------------
+import os, streamlit as st
+import sys, subprocess
+import cv2
+import numpy as np
+from PIL import Image
+import pandas as pd
+from datetime import datetime
+import random
+import plotly.express as px
+from emotion_utils.detector import EmotionDetector
+import hashlib
+import tempfile
+from location_utils.extract_gps import extract_gps, convert_gps
+from location_utils.geocoder import get_address_from_coords
+from location_utils.landmark import load_models, detect_landmark, query_landmark_coords, LANDMARK_KEYWORDS
+import functools
+
+# [Previous code remains exactly the same until the main_app function]
+
 def main_app():
     username = st.session_state.get("username", "")
     sidebar_design(username)
@@ -347,20 +366,20 @@ def main_app():
 
         with tabs[0]:
             uploaded_file = st.file_uploader("Upload an image (JPG/PNG)", type=["jpg", "png"])
-           if uploaded_file:
-               with st.spinner("Processing image..."):
-                   with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                       tmp_file.write(uploaded_file.read())
-                       temp_path = tmp_file.name
-                   
-                   try:
-                       image = Image.open(uploaded_file).convert("RGB")
-                       img_array = np.array(image)
-                       img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-            
-                       # Convert image to bytes for caching
-                       _, img_bytes = cv2.imencode('.jpg', img)
-                       detections = detect_emotions_cached(img_bytes.tobytes())  
+            if uploaded_file:
+                with st.spinner("Processing image..."):
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+                        tmp_file.write(uploaded_file.read())
+                        temp_path = tmp_file.name
+                        
+                    try:
+                        image = Image.open(uploaded_file).convert("RGB")
+                        img_array = np.array(image)
+                        img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                        
+                        # Convert image to bytes for caching
+                        _, img_bytes = cv2.imencode('.jpg', img)
+                        detections = detect_emotions_cached(img_bytes.tobytes())
                         
                         if detections:
                             detector = get_detector()
