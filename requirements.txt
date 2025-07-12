@@ -1,4 +1,3 @@
-# Core dependencies
 streamlit>=1.30.0
 pillow==10.1.0
 opencv-python-headless==4.9.0.80
@@ -7,17 +6,12 @@ pandas>=1.3.0
 matplotlib==3.8.2
 seaborn==0.13.0
 plotly>=5.0.0
-
-# DeepFace & Emotion analysis
 deepface==0.0.79
 tensorflow>=2.6.0,<2.16.0
 protobuf==3.20.3
-
-# Geolocation
 geopy==2.4.1
 python-dotenv==1.0.0
-
-# CLIP model support (Hugging Face Transformers)
 transformers==4.39.3
 torch>=2.1.0
-
+concurrent-log-handler>=0.9.20
+joblib>=1.3.2
