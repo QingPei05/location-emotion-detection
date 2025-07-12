@@ -20,4 +20,5 @@ python-dotenv==1.0.0
 # CLIP model support (Hugging Face Transformers)
 transformers==4.39.3
 torch>=2.1.0
+retina-face==0.0.10
 
